@@ -877,10 +877,10 @@ const server = http.createServer(async (req, res) => {
 
   if (pathn === '/api/me') {
     const s = getSession(req);
-    return json(res, 200, { authed: !!s, username: s ? s.username : null });
+    return json(res, 200, { enabled: authEnabled(), authed: !!s, username: s ? s.username : null });
   }
 
-  if (pathn === '/api/printers' && req.method === 'GET') return json(res, 200, snapshot(!!getSession(req)));
+  if (pathn === '/api/printers' && req.method === 'GET') return json(res, 200, snapshot(authEnabled() ? !!getSession(req) : true));
 
   if (pathn === '/api/printers' && req.method === 'POST') {
     const b = await readBody(req);
