@@ -109,7 +109,7 @@ sudo bash change-password.sh --rotate   # 生成 18 位强密码并立即生效
 }
 ```
 
-- **密码在哪 / 怎么设置**：Linux 用 `install.sh`（自动生成随机强密码，明文存 `/opt/printer-monitor/.admin-password.txt`）或 `sudo bash change-password.sh`；Windows 用同目录 `set-password.bat`（如 `set-password.bat --rotate`）。`printers.json` 的 `auth` 段只存 **scrypt 盐+哈希（不存明文密码）**；管理员明文另存 `.admin-password.txt`（权限 600）便于查阅。
+- **密码在哪 / 怎么设置**：Linux 用 `install.sh`（自动生成随机强密码，明文存 `/opt/printer-monitor/.admin-password.txt`）或 `sudo bash change-password.sh`；Windows **直接双击同目录 `set-password.bat`** 选 [1] 自动强密码 / [2] 自定义密码。`printers.json` 的 `auth` 段只存 **scrypt 盐+哈希（不存明文密码）**；管理员明文另存 `.admin-password.txt`（权限 600）便于查阅。
 - **默认（未配置 `auth` 段，如 Windows 便携版出厂状态）：无需登录，打开面板即为管理员**，添加 / 删除 / 扫描等写操作直接可用——适合本机 / 内网信任环境。
 
 > **📡 网段与区域（拓扑无关）**：本平台对网络拓扑**没有任何要求**——打印机可以全在**同一个网段**，也可以分散在**多个网段 / 多个楼层 / 多个办公室**。每台打印机只需要一个「运行监控的机器能 ping 通」且已开启 SNMP 的 IP。**只有一台打印机、或只有一个网段，照常使用，无需任何额外配置**；配置示例里写了两个不同网段，只是为了演示「跨网段也支持」，不代表必须这样分。
@@ -148,7 +148,7 @@ A：检查运行监控的机器能否 `ping` 通打印机 IP，且打印机 SNMP
 A：部分 HP 机型 `prtInputTable` 的容量字段不可信（哨兵值），本平台已做兼容：仅当容量可信且余量为 0 才判缺纸；`prtAlertTable` 的 1006/1005 仍作为权威缺纸 / 少纸信号。
 
 **Q：Windows 版要登录吗？系统密码在哪？**
-A：Windows 便携版**默认不启用登录、没有密码**——打开面板就是管理员，添加 / 删除 / 扫描等按钮直接可用（适合本机 / 内网信任环境）。只有当这台 Windows 会被"别人打开浏览器"访问（当小服务器用）时，才需要开启登录：在本目录命令行执行 `set-password.bat --rotate`（自动生成 18 位强密码）或 `set-password.bat 你的密码`，之后用户名 `admin`，明文密码在本目录 `.admin-password.txt`，点面板左上角打印机 logo 登录。Linux 服务器版（install.sh 部署）默认已启用登录，初始密码在 `/opt/printer-monitor/.admin-password.txt`，改密用 `sudo bash change-password.sh`。
+A：Windows 便携版**默认不启用登录、没有密码**——打开面板就是管理员，添加 / 删除 / 扫描等按钮直接可用（适合本机 / 内网信任环境）。只有当这台 Windows 会被"别人打开浏览器"访问（当小服务器用）、或你想像 Linux 一样加登录保护时，才需要开启登录：**直接双击本目录 `set-password.bat`**，选 [1] 自动生成随机强密码（推荐，和 Linux 一致）或选 [2] 自己设密码；之后用户名 `admin`，明文密码在本目录 `.admin-password.txt`，点面板左上角打印机 logo 登录。Linux 服务器版（install.sh 部署）默认已启用登录，初始密码在 `/opt/printer-monitor/.admin-password.txt`，改密用 `sudo bash change-password.sh`。
 
 **Q：换端口 / 改密码？**
 A：Windows 改 `printers.json` 的 `port` 或 `start.bat` 加 `--port`；Linux 重跑 `install.sh PORT=新端口` 或 `change-password.sh`。
