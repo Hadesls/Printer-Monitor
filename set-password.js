@@ -54,15 +54,30 @@ function apply(user, pw) {
   fs.writeFileSync(CONF, JSON.stringify(cfg, null, 2), 'utf8');
   fs.writeFileSync(PASSFILE, pw, 'utf8');
   try { fs.chmodSync(PASSFILE, 0o600); } catch (e) {}
+  const win = process.platform === 'win32';
   console.log('');
-  console.log('✓ 已启用登录认证，并写入 printers.json');
-  console.log('  用户名   : ' + user);
-  console.log('  密码     : ' + pw);
-  console.log('  密码文件 : ' + PASSFILE);
+  if (win) {
+    // Windows: 纯 ASCII 输出, 避免 cmd(GBK) 下中文乱码/看不到密码
+    console.log('[OK] Login authentication enabled and saved to printers.json');
+    console.log('     Username : ' + user);
+    console.log('     Password : ' + pw);
+    console.log('     Saved to : ' + PASSFILE);
+  } else {
+    console.log('✓ 已启用登录认证，并写入 printers.json');
+    console.log('  用户名   : ' + user);
+    console.log('  密码     : ' + pw);
+    console.log('  密码文件 : ' + PASSFILE);
+  }
   console.log('');
-  console.log('注意：配置在服务启动时读取——');
-  console.log('  Windows：关闭黑色服务窗口，重新双击 start.bat 生效；');
-  console.log('  Linux：systemctl restart printer-monitor 生效。');
+  if (win) {
+    console.log('NEXT STEP: close the black service window, then double-click start.bat again to apply.');
+    console.log('          To log in later: click the printer logo at top-left of the panel.');
+    console.log('          KEEP A COPY OF THE PASSWORD above (it is also stored in .admin-password.txt).');
+  } else {
+    console.log('注意：关闭黑色服务窗口，重新双击 start.bat 生效；');
+    console.log('      登录入口=点面板左上角 logo 图标。');
+    console.log('      Linux 部署: systemctl restart printer-monitor 生效。');
+  }
 }
 
 const args = process.argv.slice(2);
