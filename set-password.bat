@@ -1,21 +1,21 @@
 @echo off
-title Printer-Monitor 管理员密码设置
+title Printer-Monitor Admin Password
 cd /d "%~dp0"
 echo ============================================
-echo   Printer-Monitor 管理员密码设置
+echo   Printer-Monitor - Set / Enable Admin Login
 echo ============================================
 echo.
 set "NODE=node.exe"
 if not exist "%NODE%" set "NODE=node"
 if not "%~1"=="" ( "%NODE%" "%~dp0set-password.js" %* & goto :done )
-echo  请选择一种方式来开启登录:
+echo  Choose an option to enable login:
 echo.
-echo     [1] 自动生成一个随机强密码   (推荐, 与 Linux 服务器一致)
-echo     [2] 自己设置一个固定密码    (至少 12 位, 需含大写+小写+数字)
-echo     [0] 取消, 不做任何修改
+echo     [1] Auto-generate a strong random password  (recommended, same as Linux)
+echo     [2] Set your own password                   (12+ chars, upper+lower+digit)
+echo     [0] Cancel
 echo.
 set "C="
-set /p C="  请输入 1 / 2 / 0 后回车: "
+set /p C="  Enter 1 / 2 / 0 and press Enter: "
 if "%C%"=="1" goto :rot
 if "%C%"=="2" goto :cust
 goto :done
@@ -25,13 +25,13 @@ echo.
 goto :done
 :cust
 set "PWD="
-set /p PWD="  请输入新密码(至少 12 位, 含大写+小写+数字): "
-if "%PWD%"=="" ( echo     密码不能为空。 & goto :done )
+set /p PWD="  Enter new password (12+ chars, upper+lower+digit): "
+if "%PWD%"=="" ( echo     Password cannot be empty. & goto :done )
 "%NODE%" "%~dp0set-password.js" admin "%PWD%"
 goto :done
 :done
 echo.
-echo  提示: 设置完成后请关闭黑色服务窗口, 再重新双击 start.bat, 登录立即生效。
-echo        登录后: 点页面左上角 logo 图标, 输入用户名和密码, 进入管理。
+echo  NEXT: close the black service window, then double-click start.bat again to apply.
+echo        To log in: click the printer logo at top-left of the panel.
 echo.
 pause
