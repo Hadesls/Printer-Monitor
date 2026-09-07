@@ -44,11 +44,24 @@ printer-monitor/
 
 ---
 
+## 📥 下载（推荐，小白直接来这）
+
+到仓库右侧 **Releases** 页面，按系统下载对应的 zip：
+
+| 系统 | 文件 | 怎么用 |
+|------|------|--------|
+| 🪟 Windows | `printer-monitor-windows.zip` | 解压后**双击 `start.bat`** 即用（内置 node.exe，零安装） |
+| 🐧 Linux | `printer-monitor-linux.zip` | 解压后 `sudo bash install.sh`（默认端口 8899，注册系统服务） |
+
+两份代码完全一致，仅启动方式不同。下面两种安装方式任选其一。
+
+---
+
 ## 🚀 快速开始
 
-### Windows 便携版（给同事直接运行）
+### Windows 便携版
 
-1. 把整个 `打印机监控平台` 文件夹（含 `node.exe`、`server.js`、`printer-monitor.html`、`node_modules/`、`1.ico`、`2.png` 等）复制到目标 Windows 电脑。
+1. 从 **Releases** 下载 `printer-monitor-windows.zip`，解压到任意目录（桌面 / D 盘均可，不要放 `C:\Program Files`）。
 2. 双击 `start.bat`，浏览器自动打开 `http://localhost:8899`。
 
 > 详见 `使用帮助.md`；内置 `node.exe`，无需安装 Node。
@@ -56,9 +69,13 @@ printer-monitor/
 ### Linux（推荐作为对外服务，systemd）
 
 ```bash
-# 把本目录传到服务器后，root 执行：
+# 方式一：下载 Releases 的 printer-monitor-linux.zip，解压后 root 执行：
 sudo bash install.sh            # 默认端口 8899
 sudo PORT=9260 bash install.sh  # 自定义端口
+
+# 方式二（有 git 环境）：克隆仓库后安装
+# git clone https://github.com/Hadesls/Printer-Monitor.git && cd Printer-Monitor
+# sudo bash install.sh
 
 # 管理
 systemctl status|restart|stop printer-monitor
