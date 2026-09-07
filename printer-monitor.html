@@ -2066,6 +2066,7 @@ document.addEventListener('keydown', e => {
 // ==================== 登录态（公开只读 + 写操作按需登录） ====================
 window.__authed = false;
 window.__username = null;
+window.__loginEnabled = true;   // 后端未配置 auth（未启用登录）时为 false → 本地面板按管理员直通
 let pendingLoginAction = null;
 
 function requireLogin(after) {
@@ -2078,8 +2079,9 @@ function requireLogin(after) {
   setTimeout(function() { const u = document.getElementById('loginUser'); if (u) u.focus(); }, 50);
 }
 function logoLoginClick() {
-  if (window.__authed) return;   // 已登录不弹，避免误触
-  requireLogin();                // 访客点击 png 图标 → 弹出登录窗口
+  if (!window.__loginEnabled) return;   // 后端未启用登录：无需登录，点击无动作
+  if (window.__authed) return;          // 已登录不弹，避免误触
+  requireLogin();                       // 访客点击 png 图标 → 弹出登录窗口
 }
 function closeLogin(e) {
   if (e && e.target && e.target.id !== 'loginOverlay') return;
@@ -2123,6 +2125,7 @@ function updateAuthBadge() {
   if (window.__authed) {
     document.body.classList.add('authed');   // 显示所有 .auth-only 操作元素
     if (el) {
+      if (!window.__loginEnabled) { el.style.display = 'none'; return; }  // 未启用登录：无徽标/退出，本地即管理员
       el.style.display = '';
       el.innerHTML = '👤 ' + escapeHtml(window.__username || 'admin') + ' · <a href="javascript:logout()" style="color:#fff;text-decoration:underline;margin-left:4px;">退出</a>';
     }
@@ -2139,7 +2142,19 @@ function doSendAlert(p) {
 // ==================== 初始化 ====================
 (async function init() {
   // 探测登录态（公开只读，写操作按需弹出登录框）
-  try { const me = await fetchJSON('/api/me'); window.__authed = !!me.authed; window.__username = me.username || null; } catch (e) {}
+  try {
+    const me = await fetchJSON('/api/me');
+    if (me && me.enabled === false) {
+      // 后端未启用登录：本地面板按「本地管理员」直通（无需密码，旧版一致行为）
+      window.__loginEnabled = false;
+      window.__authed = true;
+      window.__username = null;
+    } else {
+      window.__loginEnabled = true;
+      window.__authed = !!(me && me.authed);
+      window.__username = (me && me.username) || null;
+    }
+  } catch (e) { window.__loginEnabled = true; }
   updateAuthBadge();
   // 先探测 SNMP 采集后端（同源 / localhost:8899）
   const connected = await connectLive(false);
