@@ -3,9 +3,52 @@
 基于 SNMP 的打印机实时监控平台：**墨粉余量、纸张、状态、卡纸 / 缺纸告警**集中在一个 Web 面板里。
 纯 Node.js + 原生前端，**零框架、零数据库、零外部服务**，单目录即可运行。
 
-- Windows：内置 `node.exe`，**双击即用**，无需安装任何东西。
-- Linux：一条 `install.sh` **一键部署**为 systemd 服务，开机自启、崩溃自拉起。
-- 跨平台：Windows / Linux / macOS 均可运行同一套 `server.js`。
+> 📥 **小白 / 只想用：直接去 [Releases](https://github.com/Hadesls/printer-snmp-monitor/releases) 下载对应系统的 zip，解压即用，不用看下面长篇。**
+>
+> | 系统 | 下载 | 怎么用 |
+> |------|------|--------|
+> | 🪟 Windows | `打印机监控平台-windows.zip` | 解压 → **双击 `start.bat`** |
+> | 🐧 Linux | `打印机监控平台-linux.zip` | 解压 → `sudo bash install.sh` |
+>
+> 两份代码**完全一样**，只是启动方式不同（Windows 双击 bat / Linux 注册成系统服务）。
+
+---
+
+## 一、🪟 Windows 用户（零基础，3 步）
+
+1. 打开仓库右侧的 **Releases**（或点上面链接）。
+2. 下载 `打印机监控平台-windows.zip`，解压到任意位置（比如桌面）。
+3. **双击里面的 `start.bat`** → 浏览器自动打开 `http://localhost:8899`。
+
+✅ 完成！zip 里已内置 `node.exe`，**不用安装任何软件**。
+
+> 面板打不开？看 `使用帮助.md`；要给别人用、想让它在后台一直跑，把解压后的文件夹放到常开电脑即可。
+
+---
+
+## 二、🐧 Linux 用户（服务器部署，对外访问）
+
+**方式 A（推荐，离线也能用）：**
+1. 在 Releases 下载 `打印机监控平台-linux.zip`，传到服务器并解压。
+2. 进入目录，root 执行：
+   ```bash
+   sudo bash install.sh           # 默认端口 8899
+   # 或自定义端口：
+   sudo PORT=9260 bash install.sh
+   ```
+3. 浏览器访问 `http://服务器IP:8899`。
+
+**方式 B（有 git + 网络）：**
+```bash
+git clone https://github.com/Hadesls/printer-snmp-monitor.git
+cd printer-snmp-monitor
+npm install            # 安装 net-snmp 等依赖
+sudo bash install.sh
+```
+
+> 重复执行 `install.sh` = **升级程序文件**，`printers.json`（设备清单 / 账户）自动保留。
+> 管理命令：`systemctl status|restart|stop printer-monitor`、`journalctl -u printer-monitor -f`。
+> 改密码：`sudo bash change-password.sh --rotate`（生成 18 位强密码并立即生效）。
 
 ---
 
@@ -25,48 +68,24 @@
 
 ---
 
-## 📂 目录结构
+## 📂 目录结构（源码仓库）
 
 ```
 printer-monitor/
 ├── server.js              # 后端（SNMP 采集 + Web 服务 + 登录认证）
 ├── printer-monitor.html   # 前端面板（单文件，无需构建）
-├── node_modules/          # SNMP 依赖（net-snmp 等，已随包提供，离线可用）
 ├── install.sh             # Linux 一键安装 / 升级脚本（systemd）
 ├── change-password.sh     # 管理员密码管理（强密码 / 定期轮换）
-├── printers.json          # 设备清单与配置（首次运行自动生成）
-├── printers.json.example   # 配置模板（git 提交，含一台模拟打印机）
+├── start.bat              # Windows 一键启动（双击即用）
+├── printers.json.example   # 配置模板（含一台模拟打印机，安全可提交）
+├── 1.ico / 2.png          # 网页图标（标签页 + 标题 logo）
 ├── .gitignore
 ├── README.md              # 本文件
-├── 部署文档.md             # 详细部署 / 升级 / 排错
-└── 使用帮助.md             # 面板使用手册
+├── 部署文档.md            # 详细部署 / 升级 / 排错
+└── 使用帮助.md            # 面板使用手册
 ```
 
----
-
-## 🚀 快速开始
-
-### Windows 便携版（给同事直接运行）
-
-1. 把整个 `打印机监控平台` 文件夹（含 `node.exe`、`server.js`、`printer-monitor.html`、`node_modules/`、`1.ico`、`2.png` 等）复制到目标 Windows 电脑。
-2. 双击 `start.bat`，浏览器自动打开 `http://localhost:8899`。
-
-> 详见 `使用帮助.md`；内置 `node.exe`，无需安装 Node。
-
-### Linux（推荐作为对外服务，systemd）
-
-```bash
-# 把本目录传到服务器后，root 执行：
-sudo bash install.sh            # 默认端口 8899
-sudo PORT=9260 bash install.sh  # 自定义端口
-
-# 管理
-systemctl status|restart|stop printer-monitor
-journalctl -u printer-monitor -f        # 看日志
-sudo bash change-password.sh --rotate   # 生成 18 位强密码并立即生效
-```
-
-> 重复执行 `install.sh` = **升级程序文件**，`printers.json`（设备清单 / 账户）自动保留。
+> **关于依赖**：源码仓库不含 `node_modules/`。Linux 离线部署请直接用 Releases 里的 `linux.zip`（已含完整依赖）；`git clone` 用户执行 `npm install` 即可。Windows 的 `windows.zip` 已内置 `node.exe` + 依赖，无需任何安装。
 
 ---
 
