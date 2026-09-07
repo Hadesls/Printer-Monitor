@@ -1,0 +1,2173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="1.ico" type="image/x-icon" />
+  <title>打印机监控平台</title>
+<style>
+:root {
+  --bg: #f5f6fa;
+  --card-bg: #ffffff;
+  --text: #1a1a2e;
+  --text-sub: #6c7293;
+  --border: #e0e4ed;
+  --primary: #4361ee;
+  --primary-light: #e8edff;
+  --green: #2ecc71;
+  --yellow: #f39c12;
+  --red: #e74c3c;
+  --gray: #95a5a6;
+  --shadow: 0 2px 8px rgba(0,0,0,0.06);
+  --radius: 12px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: 0;
+}
+/* ===== 顶栏 ===== */
+.topbar {
+  background: var(--card-bg);
+  padding: 16px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: var(--shadow);
+  position: sticky;
+  top: 0; z-index: 100;
+}
+.topbar-left { display: flex; align-items: center; gap: 12px; }
+.logo-icon {
+  width: 45px; height: 45px;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  cursor: pointer;
+}
+.logo-icon img { width: 45px; height: 45px; object-fit: contain; display: block; }
+.topbar-title { font-size: 20px; font-weight: 700; }
+.topbar-sub { font-size: 12px; color: var(--text-sub); }
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.refresh-btn {
+  background: var(--primary-light);
+  color: var(--primary);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all .2s;
+}
+.refresh-btn:hover { background: var(--primary); color: #fff; }
+.live-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  background: var(--green);
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity:1; }
+  50% { opacity:.4; }
+}
+.live-text { font-size: 12px; color: var(--text-sub); }
+
+/* ===== 容器 ===== */
+.container { padding: 24px 28px; }
+
+/* ===== 统计卡片 ===== */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  margin-bottom: 24px;
+}
+.stat-card {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: transform .2s;
+}
+.stat-card:hover { transform: translateY(-3px); }
+.stat-icon.red { background: #fdeaea; color: var(--red); }
+.stat-card.alert { border: 1.5px solid var(--red); box-shadow: 0 2px 14px rgba(231,76,60,.18); }
+.stat-card.alert .stat-num { color: var(--red); }
+.stat-card.clickable { cursor: pointer; }
+.stat-card.clickable:active { transform: translateY(-1px); }
+.stat-card.selected { outline: 2px solid var(--primary); outline-offset: -2px; box-shadow: 0 4px 16px rgba(59,130,246,.18); }
+.stat-card.selected .stat-num { color: var(--primary); }
+.stat-icon {
+  width: 52px; height: 52px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+}
+.stat-icon.blue { background: #e8edff; color: var(--primary); }
+.stat-icon.green { background: #e8f9f0; color: var(--green); }
+.stat-icon.yellow { background: #fff5e6; color: var(--yellow); }
+.stat-icon.red { background: #fdeaea; color: var(--red); }
+.stat-num { font-size: 32px; font-weight: 800; line-height: 1; }
+.stat-label { font-size: 13px; color: var(--text-sub); margin-top: 4px; }
+
+/* ===== 主内容布局 ===== */
+.main-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 20px;
+}
+
+/* ===== 面板通用 ===== */
+.panel {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.panel-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.panel-title { font-size: 16px; font-weight: 700; }
+
+/* ===== 筛选条 ===== */
+.filter-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.search-input {
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  outline: none;
+  width: 200px;
+  transition: border .2s;
+}
+.search-input:focus { border-color: var(--primary); }
+.filter-chips { display: flex; gap: 8px; }
+.chip {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text-sub);
+  transition: all .2s;
+  user-select: none;
+}
+.chip:hover { border-color: var(--primary); color: var(--primary); }
+.chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.zone-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.zone-office { background: #e7f1ff; color: #1769ff; border: 1px solid #c5dcff; }
+.zone-lab { background: #f3e8ff; color: #8e44ad; border: 1px solid #e0c8f5; }
+.zone-other { background: #eef0f2; color: #7f8c8d; border: 1px solid #dfe3e6; }
+.zone-chips { display: flex; gap: 8px; margin-left: auto; }
+.row-no { font-size: 12px; color: var(--text-sub); font-weight: 600; margin-bottom: 2px; }
+.paper-badge { display: inline-block; padding: 3px 9px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+.paper-badge.ok { background: #e8f8ef; color: #1e9e5a; }
+.paper-badge.low { background: #fff4e0; color: #e67e22; }
+.paper-badge.empty { background: #fdeaea; color: #e74c3c; }
+.op-cell { white-space: nowrap; }
+/* 仅登录可见：未登录(访客/公开只读)默认隐藏，登录后 body.authed 才显示 */
+.auth-only { display: none; }
+body.authed .auth-only { display: inline-block; }
+body.authed th.auth-only, body.authed td.auth-only { display: table-cell; }
+.icon-btn { border: 0; background: #eef2f7; color: #3b6fb0; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 14px; margin-right: 6px; }
+.icon-btn:hover { background: #dbe6f3; }
+/* 分页 */
+.pagination { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 4px 2px; font-size: 13px; color: var(--text-sub); }
+.page-info { font-size: 13px; }
+.page-btns { display: flex; gap: 4px; align-items: center; }
+.page-btn { border: 1px solid var(--border); background: #fff; color: var(--text-sub); padding: 5px 11px; border-radius: 7px; cursor: pointer; font-size: 13px; }
+.page-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.page-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.page-btn:disabled { opacity: .45; cursor: not-allowed; }
+.page-ellipsis { color: var(--gray); padding: 0 2px; }
+.page-size select { padding: 4px 6px; border: 1px solid var(--border); border-radius: 7px; font-size: 13px; margin-left: 4px; }
+
+/* ===== 打印机表格 ===== */
+.table-wrap { overflow-x: auto; }
+table.printer-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.printer-table th {
+  text-align: left;
+  padding: 12px 16px;
+  color: var(--text-sub);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+.printer-table th:hover { color: var(--primary); }
+.printer-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f2f8;
+  vertical-align: middle;
+}
+.printer-table tbody tr { cursor: pointer; transition: background .15s; }
+.printer-table tbody tr:hover { background: #f8f9fc; }
+.printer-name { font-weight: 600; }
+.printer-model { font-size: 11px; color: var(--text-sub); }
+.ip-text { font-family: "SF Mono", "Courier New", monospace; font-size: 12px; color: var(--text-sub); }
+
+/* ===== 状态徽章 ===== */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badge::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+}
+.badge.online { background: #e8f9f0; color: var(--green); }
+.badge.online::before { background: var(--green); }
+.badge.offline { background: #f0f0f0; color: var(--gray); }
+.badge.offline::before { background: var(--gray); }
+.badge.error { background: #fdeaea; color: var(--red); }
+.badge.error::before { background: var(--red); }
+.badge.printing { background: #e8edff; color: var(--primary); }
+.badge.printing::before { background: var(--primary); }
+.badge.idle { background: #fff5e6; color: var(--yellow); }
+.badge.idle::before { background: var(--yellow); }
+
+/* ===== 墨粉进度条 ===== */
+.toner-cell { min-width: 120px; }
+.toner-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.toner-bar {
+  flex: 1;
+  height: 8px;
+  background: #f0f2f8;
+  border-radius: 4px;
+  overflow: hidden;
+  min-width: 80px;
+}
+.toner-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width .6s ease;
+}
+.toner-fill.ok { background: var(--green); }
+.toner-fill.warn { background: var(--yellow); }
+.toner-fill.crit { background: var(--red); }
+.toner-fill.unknown { background: repeating-linear-gradient(45deg, #b2bec3, #b2bec3 6px, #cbd5dc 6px, #cbd5dc 12px); }
+.toner-pct { font-size: 12px; font-weight: 600; min-width: 36px; text-align: right; }
+
+/* 彩色墨粉四色条 */
+.color-toners { display: flex; gap: 6px; }
+.color-toner-item {
+  flex: 1;
+  text-align: center;
+}
+.color-toner-label { font-size: 10px; color: var(--text-sub); margin-bottom: 3px; }
+.color-toner-track {
+  height: 6px;
+  background: #f0f2f8;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.color-toner-fill {
+  height: 100%;
+  border-radius: 3px;
+}
+
+/* ===== 告警列表 ===== */
+.alert-item {
+  padding: 14px 20px;
+  border-bottom: 1px solid #f0f2f8;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.alert-item:last-child { border-bottom: none; }
+.alert-pager {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 12px; border-top: 1px solid #f0f2f8; font-size: 13px; color: var(--text-sub);
+}
+.ap-info { white-space: nowrap; }
+.ap-btn {
+  border: 1px solid #d5dbe3; background: #fff; color: var(--text);
+  border-radius: 7px; padding: 5px 12px; font-size: 13px; cursor: pointer; transition: background .15s;
+}
+.ap-btn:hover:not(:disabled) { background: #f0f2f8; }
+.ap-btn:disabled { opacity: .4; cursor: not-allowed; }
+.alert-icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.alert-icon.crit { background: #fdeaea; color: var(--red); }
+.alert-icon.warn { background: #fff5e6; color: var(--yellow); }
+.alert-icon.info { background: #e8edff; color: var(--primary); }
+.alert-content { flex: 1; }
+.alert-title { font-size: 13px; font-weight: 600; }
+.alert-desc { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
+.alert-time { font-size: 11px; color: var(--gray); margin-top: 4px; }
+.alert-empty { padding: 40px; text-align: center; color: var(--gray); font-size: 14px; }
+.alert-meta { display: flex; gap: 8px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
+.alert-cat { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 11px; font-weight: 600; background: #eef2f7; color: #3b6fb0; }
+.alert-zone { font-size: 11px; color: var(--text-sub); }
+.alert-since { font-size: 11px; color: #e07b00; font-weight: 600; }
+.alert-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; margin-left: auto; }
+.alert-btn { border: 1px solid var(--border); background: #fff; color: var(--text-sub); padding: 5px 10px; border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 600; white-space: nowrap; transition: all .15s; }
+.alert-btn:hover { border-color: var(--primary); color: var(--primary); }
+.alert-btn.ghost { color: var(--gray); }
+.alert-btn.ghost:hover { border-color: var(--green); color: var(--green); }
+.muted-section { margin-top: 14px; border-top: 1px dashed var(--border); padding-top: 12px; }
+.muted-section-title { font-size: 12px; color: var(--gray); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.muted-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: rgba(0,0,0,.025); border: 1px solid var(--border); border-radius: 9px; margin-bottom: 7px; }
+.muted-item .muted-icon { font-size: 15px; filter: grayscale(1); opacity: .7; }
+.muted-item .muted-text { flex: 1; min-width: 0; }
+.muted-item .muted-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.muted-item .muted-sub { font-size: 11px; color: var(--gray); }
+.muted-unblock { border: 1px solid var(--border); background: #fff; color: var(--text-sub); padding: 5px 10px; border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 600; white-space: nowrap; transition: all .15s; }
+.muted-unblock:hover { border-color: var(--red); color: var(--red); }
+
+/* ===== 墨粉分布图 ===== */
+.dist-panel { margin-top: 20px; }
+.dist-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+}
+.dist-label { width: 80px; font-size: 13px; font-weight: 600; }
+.dist-bar { flex: 1; height: 24px; background: #f0f2f8; border-radius: 6px; overflow: hidden; }
+.dist-fill { height: 100%; border-radius: 6px; display: flex; align-items: center; padding-left: 10px; font-size: 11px; color: #fff; font-weight: 600; transition: width .6s; }
+.dist-count { width: 30px; text-align: right; font-size: 13px; font-weight: 700; }
+
+/* ===== 详情弹窗 ===== */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 1000;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(3px);
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: #fff;
+  border-radius: 16px;
+  width: 560px;
+  max-width: 90vw;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+}
+.modal-header {
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+.modal-title { font-size: 18px; font-weight: 700; }
+.modal-close {
+  width: 32px; height: 32px;
+  border: none;
+  background: #f0f2f8;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--text-sub);
+  transition: all .2s;
+}
+.modal-close:hover { background: var(--red); color: #fff; }
+.login-modal { width: 300px; }
+.login-body { padding: 22px 22px 20px; }
+.login-submit { width: 100%; margin-top: 4px; }
+.modal-body { padding: 24px; }
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.detail-item {}
+.detail-label { font-size: 12px; color: var(--text-sub); margin-bottom: 4px; }
+.detail-value { font-size: 14px; font-weight: 600; }
+.detail-section-title { font-size: 14px; font-weight: 700; margin: 20px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.detail-attr { display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; border-bottom: 1px solid #f5f6fa; }
+.detail-attr-key { color: var(--text-sub); }
+.detail-attr-val { font-weight: 600; }
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.btn {
+  padding: 9px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all .2s;
+}
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: #3349c4; }
+.btn-secondary { background: #f0f2f8; color: var(--text); }
+.btn-secondary:hover { background: #e0e4ed; }
+
+/* ===== 添加/删除按钮 ===== */
+.add-btn {
+  background: var(--green);
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all .2s;
+  white-space: nowrap;
+}
+.add-btn:hover { background: #27ae60; }
+.del-btn {
+  background: none;
+  border: none;
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--gray);
+  font-size: 14px;
+  transition: all .2s;
+}
+.del-btn:hover { background: #fdeaea; color: var(--red); }
+
+/* ===== 批量选择 ===== */
+.col-select { width: 38px; text-align: center; }
+.col-select input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; vertical-align: middle; }
+.batch-del-btn { background: var(--red); color: #fff; border: none; font-weight: 600; }
+.batch-del-btn:hover { filter: brightness(0.93); }
+
+/* ===== 表单 ===== */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.form-item { display: flex; flex-direction: column; gap: 5px; }
+.form-item.full { grid-column: 1 / -1; }
+.form-label { font-size: 12px; font-weight: 600; color: var(--text-sub); }
+.form-label .req { color: var(--red); }
+.form-input, .form-select {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  outline: none;
+  transition: border .2s;
+  font-family: inherit;
+  background: #fff;
+  color: var(--text);
+}
+.form-input:focus, .form-select:focus { border-color: var(--primary); }
+.form-input.error { border-color: var(--red); background: #fff8f8; }
+.form-error { font-size: 11px; color: var(--red); display: none; }
+.form-error.show { display: block; }
+.toner-inputs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.toner-input-group {
+  background: #f8f9fc;
+  border-radius: 8px;
+  padding: 10px;
+  text-align: center;
+}
+.toner-input-group label { font-size: 11px; font-weight: 700; display: block; margin-bottom: 6px; }
+.toner-input-group input {
+  width: 100%;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  text-align: center;
+  outline: none;
+}
+.toner-input-group input:focus { border-color: var(--primary); }
+
+/* ===== 删除确认弹窗 ===== */
+.confirm-body { padding: 28px 24px; text-align: center; }
+.confirm-icon {
+  width: 56px; height: 56px;
+  background: #fdeaea;
+  color: var(--red);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px;
+  margin: 0 auto 14px;
+}
+.confirm-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+.confirm-text { font-size: 13px; color: var(--text-sub); line-height: 1.7; }
+
+/* ===== Toast 提示 ===== */
+.toast {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: var(--text);
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: all .3s;
+  z-index: 2000;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ===== 数据源徽章 ===== */
+.src-badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 20px;
+  background: #fff5e6;
+  color: var(--yellow);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+}
+.src-badge.live { background: #e8f9f0; color: var(--green); }
+
+/* ===== 扫描结果 ===== */
+.scan-item {
+  display: flex; gap: 10px; align-items: center;
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+  margin-bottom: 6px; font-size: 12px; transition: all .15s; background: #fff;
+}
+.scan-item:hover { border-color: var(--primary); background: #f8f9fc; }
+.scan-item b { font-family: monospace; min-width: 108px; }
+.scan-item .scan-info { flex: 1; min-width: 0; }
+.scan-item .scan-info .scan-model { color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scan-item .scan-info .scan-note { color: var(--text-sub); font-size: 11px; margin-top: 2px; line-height: 1.4; }
+.scan-item input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
+.scan-tag { font-size: 11px; padding: 1px 7px; border-radius: 10px; white-space: nowrap; flex-shrink: 0; }
+.scan-tag.snmp { background: #e8f5e9; color: #2e7d32; }
+.scan-tag.ports { background: #fff3e0; color: #e65100; }
+.scan-tag.mon { background: #eef0f4; color: #61666f; }
+.scan-tag.crit { background: #fdecec; color: #e74c3c; }
+.scan-fill-btn { font-size: 12px; color: var(--primary); text-decoration: underline; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+.scan-summary { font-size: 12px; color: var(--text-sub); padding: 4px 2px 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.scan-summary .scan-batch-btn { margin-left: auto; }
+.scan-quick-chip { display: inline-block; margin: 0 10px 4px 0; color: var(--primary); text-decoration: underline; cursor: pointer; }
+
+/* ===== 响应式 ===== */
+@media (max-width: 1100px) {
+  .main-grid { grid-template-columns: 1fr; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .stats-grid { grid-template-columns: 1fr; }
+  .container { padding: 16px; }
+  .search-input { width: 140px; }
+}
+</style>
+</head>
+<body>
+
+<!-- 顶栏 -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="logo-icon" onclick="logoLoginClick()" title="点击登录"><img src="2.png" alt="打印机监控平台"></div>
+    <div>
+      <div class="topbar-title">打印机监控平台</div>
+      <div class="topbar-sub">墨粉余量与设备状态实时监控</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span class="live-dot" id="liveDot"></span>
+    <span class="live-text" id="liveTime">实时监控中</span>
+    <span class="src-badge" id="srcBadge" onclick="connectLive(true)" title="点击重试连接采集后端">🟡 检测后端中…</span>
+    <span class="src-badge" id="authBadge" style="display:none;"></span>
+    <button class="refresh-btn" id="resetBtn" style="background:#f0f2f8;color:var(--text-sub);" onclick="resetDemoData()" title="清空本地数据（不影响 SNMP 后端设备）">清空本地</button>
+    <button class="refresh-btn" onclick="refreshData()">↻ 刷新数据</button>
+  </div>
+</div>
+
+<div class="container">
+  <!-- 统计卡片 -->
+  <div class="stats-grid">
+    <div class="stat-card clickable" id="cardTotal" onclick="setFilter('all')" title="点击：显示全部打印机（清除筛选）">
+      <div class="stat-icon blue">🖨️</div>
+      <div>
+        <div class="stat-num" id="statTotal">0</div>
+        <div class="stat-label">打印机总数</div>
+      </div>
+    </div>
+    <div class="stat-card clickable" id="cardOnline" onclick="setFilter('online')" title="点击筛选：仅显示在线设备">
+      <div class="stat-icon green">✓</div>
+      <div>
+        <div class="stat-num" id="statOnline">0</div>
+        <div class="stat-label">在线运行</div>
+      </div>
+    </div>
+    <div class="stat-card clickable" id="cardWarn" onclick="setFilter('warn')" title="点击筛选：仅显示墨粉不足设备">
+      <div class="stat-icon yellow">⚠</div>
+      <div>
+        <div class="stat-num" id="statWarning">0</div>
+        <div class="stat-label">墨粉不足</div>
+      </div>
+    </div>
+    <div class="stat-card clickable" id="cardOffline" onclick="setFilter('offline')" title="点击筛选：仅显示离线/故障设备">
+      <div class="stat-icon red">✕</div>
+      <div>
+        <div class="stat-num" id="statOffline">0</div>
+        <div class="stat-label">离线/故障</div>
+      </div>
+    </div>
+    <div class="stat-card clickable" id="cardPaperOut" onclick="setFilter('paperOut')" title="点击筛选：仅显示缺纸设备">
+      <div class="stat-icon red">⛔</div>
+      <div>
+        <div class="stat-num" id="statPaperOut">0</div>
+        <div class="stat-label">缺纸告警</div>
+      </div>
+    </div>
+    <div class="stat-card clickable" id="cardJam" onclick="setFilter('jam')" title="点击筛选：仅显示卡纸设备">
+      <div class="stat-icon red">🧯</div>
+      <div>
+        <div class="stat-num" id="statJam">0</div>
+        <div class="stat-label">卡纸告警</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon purple">📄</div>
+      <div>
+        <div class="stat-num" id="statPaper">0</div>
+        <div class="stat-label">累计用纸(页)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主内容 -->
+  <div class="main-grid">
+    <!-- 左侧：打印机列表 -->
+    <div>
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">设备列表</div>
+          <div class="filter-bar">
+            <button class="add-btn auth-only" onclick="openAddModal()">＋ 添加打印机</button>
+            <button class="btn btn-danger batch-del-btn auth-only" id="batchDelBtn" onclick="openBatchDelete()" style="display:none;">🗑 批量删除(<span id="selCount">0</span>)</button>
+            <input type="text" class="search-input" id="searchInput" placeholder="搜索名称/型号/IP..." oninput="renderTable()">
+            <div class="filter-chips" id="filterChips">
+              <span class="chip active" data-filter="all" onclick="setFilter('all')">全部</span>
+              <span class="chip" data-filter="online" onclick="setFilter('online')">在线</span>
+              <span class="chip" data-filter="warn" onclick="setFilter('warn')">墨粉不足</span>
+              <span class="chip" data-filter="offline" onclick="setFilter('offline')">离线</span>
+            </div>
+            <div class="filter-chips zone-chips" id="zoneChips">
+              <span class="chip active" data-zone="all" onclick="setZone('all')">全部区域</span>
+              <span class="chip" data-zone="office" onclick="setZone('office')">🏢 办公区</span>
+              <span class="chip" data-zone="lab" onclick="setZone('lab')">🔬 实验区</span>
+            </div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="printer-table">
+            <thead>
+              <tr>
+                <th class="col-select">#<br><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)" title="全选当前页"></th>
+                <th onclick="sortTable('name')">打印机</th>
+                <th onclick="sortTable('location')">位置</th>
+                <th onclick="sortTable('zone')">区域</th>
+                <th onclick="sortTable('ip')">IP地址</th>
+                <th onclick="sortTable('status')">状态</th>
+                <th onclick="sortTable('toner')">墨粉余量</th>
+                <th onclick="sortTable('pages')">已打印页数</th>
+                <th class="auth-only">操作</th>
+              </tr>
+            </thead>
+            <tbody id="printerTbody"></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="pagination"></div>
+      </div>
+
+      <!-- 墨粉余量分布 -->
+      <div class="panel dist-panel">
+        <div class="panel-header">
+          <div class="panel-title">墨粉余量分布</div>
+        </div>
+        <div id="distContent"></div>
+      </div>
+    </div>
+
+    <!-- 右侧：告警面板 -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">告警通知 <span id="alertCount" style="font-size:12px;color:var(--text-sub);font-weight:400;"></span></div>
+        <button class="btn btn-sm" onclick="clearAllAlerts()">🧹 清理全部</button>
+      </div>
+      <div class="filter-chips alert-chips" id="alertChips">
+        <span class="chip active" data-acat="all" onclick="setAlertCat('all')">全部</span>
+        <span class="chip" data-acat="墨粉" onclick="setAlertCat('墨粉')">墨粉</span>
+        <span class="chip" data-acat="缺纸" onclick="setAlertCat('缺纸')">缺纸</span>
+        <span class="chip" data-acat="卡纸" onclick="setAlertCat('卡纸')">卡纸</span>
+        <span class="chip" data-acat="离线" onclick="setAlertCat('离线')">离线/故障</span>
+      </div>
+      <div id="alertList"></div>
+      <div id="alertPager" class="alert-pager"></div>
+      <div id="mutedSection" class="muted-section" style="display:none;">
+        <div class="muted-section-title">🔕 已屏蔽 / 已静音的通知</div>
+        <div id="mutedList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 详情弹窗 -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">打印机详情</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">关闭</button>
+      <button class="btn btn-danger auth-only" style="background:var(--red);color:#fff;" onclick="deleteFromDetail()">🗑 删除设备</button>
+      <button class="btn btn-primary auth-only" id="modalActionBtn">发送告警通知</button>
+    </div>
+  </div>
+</div>
+
+<!-- 登录弹窗（平时隐藏，执行写操作且无会话时弹出） -->
+<div class="modal-overlay" id="loginOverlay" style="display:none;" onclick="closeLogin(event)">
+  <div class="modal login-modal" style="width:300px;" onclick="event.stopPropagation()">
+    <div class="modal-body login-body">
+      <div class="form-item">
+        <label class="form-label">用户名</label>
+        <input type="text" class="form-input" id="loginUser" placeholder="请输入用户名" autocomplete="username">
+      </div>
+      <div class="form-item">
+        <label class="form-label">密码</label>
+        <input type="password" class="form-input" id="loginPass" placeholder="请输入密码" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitLogin()">
+      </div>
+      <div class="form-error show" id="loginError" style="margin-bottom:14px;"></div>
+      <button class="btn btn-primary login-submit" onclick="submitLogin()">登录</button>
+    </div>
+  </div>
+</div>
+
+<!-- 添加打印机弹窗 -->
+<div class="modal-overlay" id="addModalOverlay" onclick="closeAddModal(event)">
+  <div class="modal" style="width:600px;" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">＋ 添加打印机</div>
+      <button class="modal-close" onclick="closeAddModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-item">
+          <label class="form-label">打印机名称 <span class="req">*</span></label>
+          <input type="text" class="form-input" id="fName" placeholder="如：财务部打印机" maxlength="30">
+          <span class="form-error" id="errName">请输入打印机名称</span>
+        </div>
+        <div class="form-item">
+          <label class="form-label">设备型号</label>
+          <input type="text" class="form-input" id="fModel" placeholder="如：HP LaserJet Pro M404" maxlength="40">
+        </div>
+        <div class="form-item">
+          <label class="form-label">位置 <span class="req">*</span></label>
+          <input type="text" class="form-input" id="fLocation" placeholder="如：3楼财务部" maxlength="30">
+          <span class="form-error" id="errLocation">请输入设备位置</span>
+        </div>
+        <div class="form-item">
+          <label class="form-label">IP地址 <span class="req">*</span></label>
+          <input type="text" class="form-input" id="fIp" placeholder="如：192.168.1.100" maxlength="15">
+          <span class="form-error" id="errIp">请输入合法的IP地址（如 192.168.1.100）</span>
+        </div>
+        <div class="form-item">
+          <label class="form-label">打印机类型</label>
+          <select class="form-select" id="fType" onchange="toggleTonerInputs()">
+            <option value="bw">黑白打印机</option>
+            <option value="color">彩色打印机（四色墨粉）</option>
+          </select>
+        </div>
+        <div class="form-item">
+          <label class="form-label">网络连接</label>
+          <select class="form-select" id="fNetwork">
+            <option value="Ethernet">Ethernet（有线）</option>
+            <option value="Wi-Fi">Wi-Fi（无线）</option>
+            <option value="USB">USB</option>
+          </select>
+        </div>
+        <div class="form-item full" id="scanRow" style="display:none;">
+          <label class="form-label">🔍 自动发现（多网段扫描）</label>
+          <div style="display:flex;gap:8px;">
+            <input type="text" class="form-input" id="scanSubnet" placeholder="多个网段用逗号分隔，如 192.168.54.0/24, 10.0.8；也支持 x.x.x 前缀或单个IP" style="flex:1;">
+            <input type="text" class="form-input" id="scanCommunity" placeholder="团体名(可选)" title="SNMP 团体名，留空用默认 public" style="width:120px;">
+            <button type="button" class="btn btn-secondary" style="white-space:nowrap;" onclick="scanNetwork()">扫描</button>
+          </div>
+          <div id="scanQuick" style="margin-top:6px;display:none;font-size:12px;color:var(--text-sub);"></div>
+          <div id="scanResult" style="margin-top:8px;display:none;max-height:280px;overflow-y:auto;"></div>
+        </div>
+        <div class="form-item full" id="demoRow" style="display:none;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+            <input type="checkbox" id="fDemo" onchange="toggleTonerInputs()">
+            <span>作为<b>模拟设备</b>添加（当前网络没有这台打印机时，用于演示流程）</span>
+          </label>
+        </div>
+        <div class="form-item full">
+          <label class="form-label">初始墨粉余量（%）</label>
+          <div class="toner-inputs" id="tonerInputs">
+            <div class="toner-input-group"><label style="color:#2c3e50;">黑</label><input type="number" min="0" max="100" value="100" id="tBlack"></div>
+            <div class="toner-input-group color-only"><label style="color:#00b8d4;">青</label><input type="number" min="0" max="100" value="100" id="tCyan"></div>
+            <div class="toner-input-group color-only"><label style="color:#e91e63;">品红</label><input type="number" min="0" max="100" value="100" id="tMagenta"></div>
+            <div class="toner-input-group color-only"><label style="color:#f39c12;">黄</label><input type="number" min="0" max="100" value="100" id="tYellow"></div>
+          </div>
+        </div>
+        <div class="form-item full" id="snmpHint" style="display:none;font-size:12px;color:var(--text-sub);background:#e8edff;border-radius:8px;padding:10px 12px;line-height:1.6;">
+          ℹ 真实设备将自动通过 <b>SNMP</b> 读取墨粉余量、状态和页数，上面的初始墨粉无需填写；设备不在线时会显示"离线"。
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeAddModal()">取消</button>
+      <button class="btn btn-primary" id="addModalSubmitBtn" onclick="submitFormPrinter()">确认添加</button>
+    </div>
+  </div>
+</div>
+
+<!-- 删除确认弹窗 -->
+<div class="modal-overlay" id="delModalOverlay" onclick="closeDelModal(event)">
+  <div class="modal" style="width:420px;" onclick="event.stopPropagation()">
+    <div class="confirm-body">
+      <div class="confirm-icon">🗑</div>
+      <div class="confirm-title">确认删除打印机？</div>
+      <div class="confirm-text" id="delConfirmText"></div>
+    </div>
+    <div class="modal-footer" style="justify-content:center;">
+      <button class="btn btn-secondary" onclick="closeDelModal()">取消</button>
+      <button class="btn btn-danger" style="background:var(--red);color:#fff;" onclick="confirmDelete()">确认删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- 批量删除确认弹窗 -->
+<div class="modal-overlay" id="batchDelModalOverlay" onclick="closeBatchDelModal(event)">
+  <div class="modal" style="width:460px;" onclick="event.stopPropagation()">
+    <div class="confirm-body">
+      <div class="confirm-icon">🗑</div>
+      <div class="confirm-title">确认批量删除 <span id="batchDelCount">0</span> 台打印机？</div>
+      <div class="confirm-text" id="batchDelText"></div>
+    </div>
+    <div class="modal-footer" style="justify-content:center;">
+      <button class="btn btn-secondary" onclick="closeBatchDelModal()">取消</button>
+      <button class="btn btn-danger" style="background:var(--red);color:#fff;" onclick="confirmBatchDelete()">确认删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast 提示 -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ==================== 模拟数据 ====================
+let printers = [];
+
+let currentFilter = 'all';
+let currentZone = 'all';      // 区域筛选：all / office(办公区) / lab(实验区)
+let pageSize = 10;             // 每页显示台数
+let currentPage = 1;           // 当前页码
+let alertPage = 1;            // 告警面板当前页
+const ALERT_PAGE_SIZE = 10;   // 告警每页最多显示条数
+// 相对时间：距「首次出现告警」过了多久
+function timeAgo(ms) {
+  if (!ms) return '';
+  const s = Math.floor((Date.now() - ms) / 1000);
+  if (s < 60) return s + ' 秒前提醒';
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + ' 分钟前提醒';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + ' 小时前提醒';
+  const d = Math.floor(h / 24);
+  return d + ' 天前提醒';
+}
+let selectedIds = new Set();   // 批量删除：选中的打印机 id
+let sortKey = 'name';
+let sortAsc = true;
+
+const statusMap = {
+  online:   { label: '在线',   class: 'online' },
+  offline:  { label: '离线',   class: 'offline' },
+  error:    { label: '故障',   class: 'error' },
+  printing: { label: '打印中', class: 'printing' },
+  idle:     { label: '空闲',   class: 'idle' }
+};
+
+// ==================== 渲染统计卡片 ====================
+function renderStats() {
+  const total = printers.length;
+  const online = printers.filter(p => ['idle','printing','warmup'].includes(p.status)).length;
+  const paperOut = printers.filter(p => p.paperEmpty).length;
+  const jam = printers.filter(p => p.jam).length;
+  const tonerLow = printers.filter(p => typeof p.toner === 'number' && p.toner > 0 && p.toner <= 20).length;
+  const offline = printers.filter(p => ['offline','error'].includes(p.status)).length;
+
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statOnline').textContent = online;
+  document.getElementById('statPaperOut').textContent = paperOut;
+  document.getElementById('statJam').textContent = jam;
+  document.getElementById('statWarning').textContent = tonerLow;
+  document.getElementById('statOffline').textContent = offline;
+  const totalPages = printers.reduce((s, p) => s + (Number(p.pages) || 0), 0);
+  document.getElementById('statPaper').textContent = totalPages.toLocaleString();
+  // 有缺纸/卡纸时对应卡片标红强调
+  const cpo = document.getElementById('cardPaperOut'); if (cpo) cpo.classList.toggle('alert', paperOut > 0);
+  const cjm = document.getElementById('cardJam'); if (cjm) cjm.classList.toggle('alert', jam > 0);
+  // 统计卡片选中态与当前筛选联动（点卡片 / 点 chip 都高亮对应卡片，点"全部"取消）
+  const selMap = { online: 'cardOnline', warn: 'cardWarn', offline: 'cardOffline', paperOut: 'cardPaperOut', jam: 'cardJam' };
+  Object.keys(selMap).forEach(k => {
+    const el = document.getElementById(selMap[k]);
+    if (el) el.classList.toggle('selected', currentFilter === k);
+  });
+}
+
+// ==================== 渲染表格 ====================
+function getFiltered() {
+  let list = [...printers];
+  // 筛选
+  if (currentFilter === 'online') {
+    list = list.filter(p => ['online','printing','idle'].includes(p.status));
+  } else if (currentFilter === 'warn') {
+    list = list.filter(p => p.toner > 0 && p.toner <= 20);
+  } else if (currentFilter === 'offline') {
+    list = list.filter(p => ['offline','error'].includes(p.status));
+  } else if (currentFilter === 'paperOut') {
+    list = list.filter(p => p.paperEmpty);
+  } else if (currentFilter === 'jam') {
+    list = list.filter(p => p.jam);
+  }
+  // 区域筛选
+  if (currentZone === 'office') {
+    list = list.filter(p => p.zone === '办公区');
+  } else if (currentZone === 'lab') {
+    list = list.filter(p => p.zone === '实验区');
+  }
+  // 搜索
+  const q = document.getElementById('searchInput').value.toLowerCase().trim();
+  if (q) {
+    list = list.filter(p =>
+      p.name.toLowerCase().includes(q) ||
+      p.model.toLowerCase().includes(q) ||
+      p.ip.includes(q) ||
+      p.location.toLowerCase().includes(q)
+    );
+  }
+  // 排序
+  list.sort((a, b) => {
+    let va = a[sortKey], vb = b[sortKey];
+    if (sortKey === 'toner') { va = a.toner; vb = b.toner; }
+    if (sortKey === 'pages') { va = a.pages; vb = b.pages; }
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    if (va < vb) return sortAsc ? -1 : 1;
+    if (va > vb) return sortAsc ? 1 : -1;
+    return 0;
+  });
+  return list;
+}
+
+function zoneClass(zone) {
+  if (zone === '办公区') return 'zone-office';
+  if (zone === '实验区') return 'zone-lab';
+  return 'zone-other';
+}
+function tonerClass(val) {
+  if (val == null || isNaN(val)) return 'unknown';
+  if (val <= 0) return 'crit';
+  if (val <= 20) return 'crit';
+  if (val <= 40) return 'warn';
+  return 'ok';
+}
+
+function renderTable() {
+  const all = getFiltered();
+  const total = all.length;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  if (currentPage > pages) currentPage = pages;
+  const start = (currentPage - 1) * pageSize;
+  const list = all.slice(start, start + pageSize);
+  const tbody = document.getElementById('printerTbody');
+  if (total === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray);">没有匹配的打印机</td></tr>';
+    renderPagination(total, pages);
+    return;
+  }
+  tbody.innerHTML = list.map((p, i) => {
+    const no = start + i + 1;
+    const st = statusMap[p.status];
+    const tc = tonerClass(p.toner);
+    const tonerHTML = p.isColor
+      ? `<div class="color-toners">
+           ${p.toners.map(t => {
+             const c = tonerClass(t.value);
+             const colors = {black:'#2c3e50',cyan:'#00b8d4',magenta:'#e91e63',yellow:'#ffc107'};
+             const bg = t.value == null ? '#b2bec3' : (colors[t.color]||'#888');
+             return `<div class="color-toner-item">
+               <div class="color-toner-label">${t.label} ${t.value == null ? '未知' : t.value + '%'}</div>
+               <div class="color-toner-track">
+                 <div class="color-toner-fill" style="width:${t.value || 0}%;background:${bg};"></div>
+               </div>
+             </div>`;
+           }).join('')}
+         </div>`
+      : `<div class="toner-bar-wrap">
+           <div class="toner-bar"><div class="toner-fill ${tc}" style="width:${p.toner || 0}%;"></div></div>
+           <span class="toner-pct">${p.toner == null ? '未知' : p.toner + '%'}</span>
+         </div>`;
+
+    return `<tr onclick="openModal(${p.id})">
+      <td class="col-select" onclick="event.stopPropagation()"><div class="row-no">${no}</div><input type="checkbox" class="row-check" data-id="${p.id}" ${selectedIds.has(p.id) ? 'checked' : ''} onchange="onRowCheck(${p.id}, this)"></td>
+      <td>
+        <div class="printer-name">${escapeHtml(p.name)}</div>
+        <div class="printer-model">${escapeHtml(p.model)}</div>
+      </td>
+      <td>${escapeHtml(p.location)}</td>
+      <td><span class="zone-badge ${zoneClass(p.zone)}">${p.zone}</span></td>
+      <td class="ip-text">${p.ip}</td>
+      <td><span class="badge ${st.class}">${st.label}</span></td>
+      <td class="toner-cell">${tonerHTML}</td>
+      <td>${p.pages.toLocaleString()}${p.maxPages ? ` <span style="color:var(--text-sub);font-size:11px;">/ ${p.maxPages.toLocaleString()}</span>` : ''}</td>
+      <td class="op-cell auth-only">
+        <button class="icon-btn" onclick="openEditModal(${p.id}, event)" title="修改设备">✎</button>
+        <button class="del-btn" onclick="deletePrinter(${p.id}, event)" title="删除设备">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+  renderPagination(total, pages);
+  updateBatchUI();   // 同步全选框与批量删除按钮状态
+}
+
+function renderPagination(total, pages) {
+  const el = document.getElementById('pagination');
+  if (total === 0) { el.innerHTML = ''; return; }
+  const from = (currentPage - 1) * pageSize + 1;
+  const to = Math.min(currentPage * pageSize, total);
+  let html = `<div class="page-info">共 ${total} 台 · 第 ${from}-${to} 台</div>`;
+  html += `<div class="page-btns">`;
+  html += `<button class="page-btn" ${currentPage <= 1 ? 'disabled' : ''} onclick="gotoPage(${currentPage - 1})">‹ 上一页</button>`;
+  const nums = [];
+  for (let n = 1; n <= pages; n++) {
+    if (n === 1 || n === pages || Math.abs(n - currentPage) <= 2) nums.push(n);
+    else if (nums[nums.length - 1] !== '...') nums.push('...');
+  }
+  nums.forEach(n => {
+    if (n === '...') html += `<span class="page-ellipsis">…</span>`;
+    else html += `<button class="page-btn ${n === currentPage ? 'active' : ''}" onclick="gotoPage(${n})">${n}</button>`;
+  });
+  html += `<button class="page-btn" ${currentPage >= pages ? 'disabled' : ''} onclick="gotoPage(${currentPage + 1})">下一页 ›</button>`;
+  html += `</div>`;
+  html += `<div class="page-size">每页 <select onchange="changePageSize(this.value)">
+    ${[10,20,50,100].map(s => `<option value="${s}" ${s === pageSize ? 'selected' : ''}>${s}</option>`).join('')}
+  </select> 台</div>`;
+  el.innerHTML = html;
+}
+function gotoPage(n) { currentPage = n; renderTable(); }
+function changePageSize(v) { pageSize = Number(v); currentPage = 1; renderTable(); }
+
+// ==================== 墨粉分布 ====================
+function renderDist() {
+  const ranges = [
+    { label: '严重不足 (0-10%)', min: 0, max: 10, color: '#e74c3c' },
+    { label: '偏低 (11-20%)', min: 11, max: 20, color: '#e67e22' },
+    { label: '警戒 (21-40%)', min: 21, max: 40, color: '#f39c12' },
+    { label: '正常 (41-100%)', min: 41, max: 100, color: '#2ecc71' },
+  ];
+  const total = printers.length;
+  let html = '';
+  ranges.forEach(r => {
+    const count = printers.filter(p => p.toner != null && p.toner >= r.min && p.toner <= r.max).length;
+    const pct = total > 0 ? (count / total * 100) : 0;
+    html += `<div class="dist-row">
+      <div class="dist-label">${r.label}</div>
+      <div class="dist-bar"><div class="dist-fill" style="width:${pct}%;background:${r.color};">${pct > 15 ? count + '台' : ''}</div></div>
+      <div class="dist-count">${count}</div>
+    </div>`;
+  });
+  const unknownCount = printers.filter(p => p.toner == null).length;
+  if (unknownCount > 0) {
+    const pct = total > 0 ? (unknownCount / total * 100) : 0;
+    html += `<div class="dist-row">
+      <div class="dist-label">未上报</div>
+      <div class="dist-bar"><div class="dist-fill" style="width:${pct}%;background:#95a5a6;">${pct > 15 ? unknownCount + '台' : ''}</div></div>
+      <div class="dist-count">${unknownCount}</div>
+    </div>`;
+  }
+  document.getElementById('distContent').innerHTML = html;
+}
+
+// ==================== 告警列表 ====================
+// 告警来自服务端快照(data.alerts)，按分类筛选展示，支持"知道了"(清理)/"屏蔽"(静音)
+let currentAlertCat = 'all';
+function renderAlerts() {
+  const all = window.__alerts || [];
+  const alerts = currentAlertCat === 'all' ? all
+    : all.filter(a => currentAlertCat === '离线' ? (a.category === '离线' || a.category === '故障') : a.category === currentAlertCat);
+  document.getElementById('alertCount').textContent = all.length ? `(${all.length})` : '';
+  const list = document.getElementById('alertList');
+  if (all.length === 0) { list.innerHTML = '<div class="alert-empty">🎉 暂无告警，所有设备运行正常</div>'; document.getElementById('alertPager').innerHTML = ''; return; }
+  if (alerts.length === 0) { list.innerHTML = '<div class="alert-empty">该分类下暂无告警</div>'; document.getElementById('alertPager').innerHTML = ''; return; }
+  // 分页：每页最多 ALERT_PAGE_SIZE 条
+  const totalPages = Math.max(1, Math.ceil(alerts.length / ALERT_PAGE_SIZE));
+  if (alertPage > totalPages) alertPage = totalPages;
+  const start = (alertPage - 1) * ALERT_PAGE_SIZE;
+  const pageItems = alerts.slice(start, start + ALERT_PAGE_SIZE);
+  const iconMap = { critical: '⛔', warning: '⚠', info: 'ℹ' };
+  list.innerHTML = pageItems.map(a => `
+    <div class="alert-item ${a.severity}">
+      <div class="alert-icon ${a.severity}">${iconMap[a.severity] || '•'}</div>
+      <div class="alert-content">
+        <div class="alert-title">${escapeHtml(a.title)}</div>
+        <div class="alert-desc">${escapeHtml(a.message || a.desc || '')}</div>
+        <div class="alert-meta">
+          <span class="alert-cat cat-${a.category}">${escapeHtml(a.category)}</span>
+          <span class="alert-zone">${escapeHtml(a.zone || '')}</span>
+          ${a.since ? `<span class="alert-since">· ${timeAgo(a.since)}</span>` : ''}
+        </div>
+      </div>
+      <div class="alert-actions">
+        <button class="alert-btn" onclick="dismissAlert('${a.id}')" title="已知悉，隐藏此条">知道了</button>
+        <button class="alert-btn ghost" onclick="suppressPrinter(${a.printerId})" title="屏蔽该设备后续所有告警">屏蔽</button>
+      </div>
+    </div>
+  `).join('');
+  renderAlertPager(alerts.length, totalPages);
+}
+function renderAlertPager(total, totalPages) {
+  const box = document.getElementById('alertPager');
+  if (totalPages <= 1) { box.innerHTML = ''; return; }
+  box.innerHTML =
+    `<span class="ap-info">${total} 条 · 第 ${alertPage}/${totalPages} 页</span>` +
+    `<button class="ap-btn" ${alertPage <= 1 ? 'disabled' : ''} onclick="alertGoto(${alertPage - 1})">‹ 上一页</button>` +
+    `<button class="ap-btn" ${alertPage >= totalPages ? 'disabled' : ''} onclick="alertGoto(${alertPage + 1})">下一页 ›</button>`;
+}
+function alertGoto(p) { alertPage = p; renderAlerts(); }
+function setAlertCat(cat) {
+  currentAlertCat = cat;
+  alertPage = 1;
+  document.querySelectorAll('#alertChips .chip').forEach(el => el.classList.remove('active'));
+  document.querySelector(`#alertChips .chip[data-acat="${cat}"]`).classList.add('active');
+  renderAlerts();
+}
+async function dismissAlert(id) {
+  if (!window.__authed) { requireLogin(function () { dismissAlert(id); }); return; }
+  try {
+    await fetchJSON(LIVE.base + '/api/alerts/dismiss', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: [id] }), timeoutMs: 6000 });
+    const snap = await tryFetchPrinters(LIVE.base); if (snap) applyLiveData(snap);
+  } catch (e) { if (e.status === 401) { requireLogin(function () { dismissAlert(id); }); return; } showToast('操作失败：' + e.message); }
+}
+async function clearAllAlerts() {
+  const all = window.__alerts || [];
+  if (!all.length) return;
+  if (!window.__authed) { requireLogin(clearAllAlerts); return; }
+  try {
+    await fetchJSON(LIVE.base + '/api/alerts/dismiss', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: all.map(a => a.id) }), timeoutMs: 8000 });
+    const snap = await tryFetchPrinters(LIVE.base); if (snap) applyLiveData(snap);
+    showToast('已清理全部告警');
+  } catch (e) { if (e.status === 401) { requireLogin(clearAllAlerts); return; } showToast('操作失败：' + e.message); }
+}
+async function suppressPrinter(id) {
+  if (!window.__authed) { requireLogin(function () { suppressPrinter(id); }); return; }
+  try {
+    await fetchJSON(LIVE.base + '/api/printers/' + id + '/suppress', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ muted: true }), timeoutMs: 6000 });
+    const snap = await tryFetchPrinters(LIVE.base); if (snap) applyLiveData(snap);
+    showToast('已屏蔽该设备的告警');
+  } catch (e) { if (e.status === 401) { requireLogin(function () { suppressPrinter(id); }); return; } showToast('操作失败：' + e.message); }
+}
+// 渲染「已屏蔽 / 已静音」区：仅当存在静音项时才显示，每条旁带「解除通知屏蔽」按钮
+function renderMuted() {
+  const sec = document.getElementById('mutedSection');
+  const list = document.getElementById('mutedList');
+  // 静音信息仅管理员可见：访客（未登录）彻底不显示，连"该区域存在"都不暴露
+  if (!window.__authed) { sec.style.display = 'none'; list.innerHTML = ''; return; }
+  const devs = window.__mutedDevices || [];
+  const alts = window.__mutedAlerts || [];
+  if (!devs.length && !alts.length) { sec.style.display = 'none'; list.innerHTML = ''; return; }
+  sec.style.display = '';
+  const rows = [];
+  devs.forEach(d => {
+    rows.push(`<div class="muted-item">
+      <div class="muted-icon">🔕</div>
+      <div class="muted-text">
+        <div class="muted-name">${escapeHtml(d.name)}</div>
+        <div class="muted-sub">已屏蔽设备 · ${escapeHtml(d.ip || '')} · ${escapeHtml(d.location || '')}</div>
+      </div>
+      <button class="muted-unblock" onclick="unsuppressPrinter(${d.id})" title="解除该设备的通知屏蔽">解除通知屏蔽</button>
+    </div>`);
+  });
+  alts.forEach(a => {
+    rows.push(`<div class="muted-item">
+      <div class="muted-icon">🔕</div>
+      <div class="muted-text">
+        <div class="muted-name">${escapeHtml(a.printerName)}</div>
+        <div class="muted-sub">已永久静音 · ${escapeHtml(a.category)}</div>
+      </div>
+      <button class="muted-unblock" onclick="undismissAlert('${a.id}')" title="解除该告警的永久静音">解除通知屏蔽</button>
+    </div>`);
+  });
+  list.innerHTML = rows.join('');
+}
+// 解除设备级屏蔽（复用 suppress 接口，muted:false）
+async function unsuppressPrinter(id) {
+  if (!window.__authed) { requireLogin(function () { unsuppressPrinter(id); }); return; }
+  try {
+    await fetchJSON(LIVE.base + '/api/printers/' + id + '/suppress', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ muted: false }), timeoutMs: 6000 });
+    const snap = await tryFetchPrinters(LIVE.base); if (snap) applyLiveData(snap);
+    showToast('已解除该设备的通知屏蔽');
+  } catch (e) { if (e.status === 401) { requireLogin(function () { unsuppressPrinter(id); }); return; } showToast('操作失败：' + e.message); }
+}
+// 解除告警的永久静音（删除 dismissedAlerts 条目，若设备仍异常则立即复现）
+async function undismissAlert(id) {
+  if (!window.__authed) { requireLogin(function () { undismissAlert(id); }); return; }
+  try {
+    await fetchJSON(LIVE.base + '/api/alerts/undismiss', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: [id] }), timeoutMs: 6000 });
+    const snap = await tryFetchPrinters(LIVE.base); if (snap) applyLiveData(snap);
+    showToast('已解除该告警的永久静音');
+  } catch (e) { if (e.status === 401) { requireLogin(function () { undismissAlert(id); }); return; } showToast('操作失败：' + e.message); }
+}
+
+// ==================== 筛选 ====================
+function setFilter(f) {
+  currentFilter = (currentFilter === f) ? 'all' : f;   // 再点同一项则取消筛选
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  const chip = document.querySelector(`.chip[data-filter="${currentFilter}"]`);
+  if (chip) chip.classList.add('active');
+  renderStats();   // 同步统计卡片选中态
+  renderTable();
+}
+function setZone(z) {
+  currentZone = z;
+  document.querySelectorAll('#zoneChips .chip').forEach(c => c.classList.remove('active'));
+  document.querySelector(`#zoneChips .chip[data-zone="${z}"]`).classList.add('active');
+  renderTable();
+}
+
+// ==================== 排序 ====================
+function sortTable(key) {
+  if (sortKey === key) { sortAsc = !sortAsc; } else { sortKey = key; sortAsc = true; }
+  renderTable();
+}
+
+// ==================== 详情弹窗 ====================
+let currentDetailId = null;
+function openModal(id) {
+  const p = printers.find(x => x.id === id);
+  if (!p) return;
+  currentDetailId = id;
+  const st = statusMap[p.status];
+  document.getElementById('modalTitle').textContent = p.name;
+
+  let tonerDetail = '';
+  if (p.isColor) {
+    tonerDetail = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      ${p.toners.map(t => {
+        const c = tonerClass(t.value);
+        const colors = {black:'#2c3e50',cyan:'#00b8d4',magenta:'#e91e63',yellow:'#ffc107'};
+        return `<div style="background:#f8f9fc;border-radius:8px;padding:12px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-size:13px;font-weight:600;">${t.label}色墨粉</span>
+            <span style="font-size:13px;font-weight:700;color:${t.value==null?'#7f8c8d':(t.value<=20?'#e74c3c':'#2ecc71')};">${t.value==null?'未知':t.value+'%'}</span>
+          </div>
+          <div class="toner-bar"><div class="toner-fill ${c}" style="width:${t.value || 0}%;background:${t.value==null?'#b2bec3':colors[t.color]} !important;"></div></div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  } else {
+    const c = tonerClass(p.toner);
+    tonerDetail = `<div style="background:#f8f9fc;border-radius:8px;padding:12px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+        <span style="font-size:13px;font-weight:600;">黑色墨粉</span>
+        <span style="font-size:13px;font-weight:700;color:${p.toner==null?'#7f8c8d':(p.toner<=20?'#e74c3c':'#2ecc71')};">${p.toner==null?'未知':p.toner+'%'}</span>
+      </div>
+      <div class="toner-bar"><div class="toner-fill ${c}" style="width:${p.toner || 0}%;"></div></div>
+    </div>`;
+  }
+
+  let body = `
+    <div class="detail-grid">
+      <div class="detail-item"><div class="detail-label">设备型号</div><div class="detail-value">${escapeHtml(p.model)}</div></div>
+      <div class="detail-item"><div class="detail-label">设备状态</div><div class="detail-value"><span class="badge ${st.class}">${st.label}</span></div></div>
+      <div class="detail-item"><div class="detail-label">位置</div><div class="detail-value">${escapeHtml(p.location)}</div></div>
+      <div class="detail-item"><div class="detail-label">区域</div><div class="detail-value"><span class="zone-badge ${zoneClass(p.zone)}">${p.zone}</span></div></div>
+      <div class="detail-item"><div class="detail-label">IP地址</div><div class="detail-value" style="font-family:monospace;">${p.ip}</div></div>
+      <div class="detail-item"><div class="detail-label">序列号</div><div class="detail-value" style="font-family:monospace;font-size:13px;">${p.serial}</div></div>
+      ${window.__authed ? `<div class="detail-item"><div class="detail-label">网络连接</div><div class="detail-value">${escapeHtml(p.network)}</div></div>` : ''}
+    </div>
+    <div class="detail-section-title">墨粉详情</div>
+    ${tonerDetail}
+    ${p.errorMsg ? `<div style="margin-top:12px;padding:12px;background:#fdeaea;border-radius:8px;color:#e74c3c;font-size:13px;font-weight:600;">⚠ ${p.errorMsg}</div>` : ''}
+    <div class="detail-section-title">设备信息</div>
+    <div class="detail-attr"><span class="detail-attr-key">已打印页数</span><span class="detail-attr-val">${p.pages.toLocaleString()}${p.maxPages ? ' / ' + p.maxPages.toLocaleString() : ''} 页</span></div>
+    <div class="detail-attr"><span class="detail-attr-key">安装日期</span><span class="detail-attr-val">${p.installDate}</span></div>
+    <div class="detail-attr"><span class="detail-attr-key">上次维护</span><span class="detail-attr-val">${p.lastMaintenance}</span></div>
+    ${p.lastError ? `<div class="detail-attr"><span class="detail-attr-key">最近错误</span><span class="detail-attr-val" style="color:var(--red);">${escapeHtml(p.lastError)}</span></div>` : ''}
+    ${p.lastSeen ? `<div class="detail-attr"><span class="detail-attr-key">数据更新</span><span class="detail-attr-val">${new Date(p.lastSeen).toLocaleString('zh-CN', { hour12: false })}</span></div>` : ''}
+  `;
+
+  document.getElementById('modalBody').innerHTML = body;
+  document.getElementById('modalActionBtn').onclick = function() {
+    if (!window.__authed) { requireLogin(function() { doSendAlert(p); }); return; }
+    doSendAlert(p);
+  };
+  document.getElementById('modalOverlay').classList.add('show');
+}
+
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('modalOverlay')) {
+    if (e.target.id !== 'modalOverlay') return;
+  }
+  document.getElementById('modalOverlay').classList.remove('show');
+}
+
+// ==================== 刷新数据 ====================
+async function refreshData() {
+  if (LIVE.mode === 'live') {
+    // 实时模式：登录用户可触发后端立即轮询；访客仅静默重新拉取快照（不暴露采集机制）
+    if (window.__authed) {
+      try { await fetchJSON(LIVE.base + '/api/poll', { method: 'POST', timeoutMs: 5000 }); } catch (e) {}
+    }
+    showToast('数据正在后台更新…');
+    setTimeout(async () => {
+      const snap = await tryFetchPrinters(LIVE.base);
+      if (snap) applyLiveData(snap);
+    }, 4000);
+    return;
+  }
+  // 演示模式：本地模拟波动
+  printers.forEach(p => {
+    if (p.status === 'offline' || p.status === 'error') return;
+    // 打印中消耗墨粉
+    if (p.status === 'printing') {
+      p.toners.forEach(t => {
+        if (t.value == null) return;
+        t.value = Math.max(0, t.value - Math.floor(Math.random() * 2));
+      });
+      const vals = p.toners.map(t => t.value).filter(v => v != null);
+      p.toner = vals.length ? Math.min(...vals) : null;
+      p.pages += Math.floor(Math.random() * 20);
+    }
+    // 随机状态变化
+    const r = Math.random();
+    if (r < 0.05) p.status = 'idle';
+    else if (r < 0.1) p.status = 'printing';
+    else if (r < 0.12) p.status = 'online';
+  });
+  renderAll();
+  // 顶栏时间
+  const now = new Date();
+  document.getElementById('liveTime').textContent = `最后更新 ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+}
+
+function renderAll() {
+  renderStats();
+  renderTable();
+  renderDist();
+  renderAlerts();
+  renderMuted();
+}
+
+// ==================== 实时数据源（SNMP 后端） ====================
+// LIVE.mode: 'demo' 本地演示 | 'live' 后端实时（SNMP采集）
+const LIVE = { mode: 'demo', base: '' };
+
+function fetchJSON(url, opts) {
+  const o = Object.assign({}, opts);
+  o.cache = 'no-store';   // 禁止 HTTP 缓存，确保每次轮询/刷新都拿到最新状态（避免旧离线设备残留旧状态）
+  if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) {
+    o.signal = AbortSignal.timeout(opts && opts.timeoutMs ? opts.timeoutMs : 3000);
+  }
+  delete o.timeoutMs;
+  return fetch(url, o).then(function(r) {
+    if (r.ok) return r.json();
+    return r.json().then(function(j) {
+      const err = new Error((j && j.error) || ('HTTP ' + r.status));
+      err.status = r.status;
+      return Promise.reject(err);
+    }, function() {
+      return Promise.reject(new Error('HTTP ' + r.status));
+    });
+  });
+}
+
+async function tryFetchPrinters(base) {
+  try {
+    const data = await fetchJSON(base + '/api/printers');
+    if (data && Array.isArray(data.printers)) return data;
+  } catch (e) {}
+  return null;
+}
+
+async function connectLive(notify) {
+  const bases = ['', 'http://localhost:8899', 'http://127.0.0.1:8899'];
+  for (const base of bases) {
+    const data = await tryFetchPrinters(base);
+    if (data) {
+      LIVE.mode = 'live';
+      LIVE.base = base;
+      applyLiveData(data);
+      return true;
+    }
+  }
+  if (LIVE.mode !== 'live') {
+    LIVE.mode = 'demo';
+    updateSrcBadge(null);
+  }
+  if (notify) showToast('未检测到采集后端（server.js），当前为本地空列表模式');
+  return false;
+}
+
+function applyLiveData(data) {
+  printers = data.printers;
+  window.__alerts = data.alerts || [];
+  window.__mutedDevices = data.suppressedDevices || [];
+  window.__mutedAlerts = data.permanentMutedAlerts || [];
+  renderAll();
+  updateSrcBadge(data.updatedAt);
+}
+
+function updateSrcBadge(updatedAt) {
+  const badge = document.getElementById('srcBadge');
+  if (LIVE.mode === 'live') {
+    // 仅登录用户可见"SNMP 实时"；访客(未登录)完全隐藏徽标，避免暴露采集机制
+    if (window.__authed) {
+      badge.textContent = '🟢 SNMP 实时';
+      badge.classList.add('live');
+      badge.style.display = '';
+      badge.title = '已连接采集后端，点击重新拉取数据';
+      document.getElementById('liveTime').textContent = updatedAt ? '实时更新中 · 更新于 ' + new Date(updatedAt).toLocaleTimeString('zh-CN', { hour12: false }) : '实时更新中';
+    } else {
+      badge.style.display = 'none';   // 访客：隐藏徽标（不显示“公开只读”）
+      document.getElementById('liveTime').textContent = updatedAt ? '实时更新于 ' + new Date(updatedAt).toLocaleTimeString('zh-CN', { hour12: false }) : '实时更新中';
+    }
+    document.getElementById('liveDot').style.background = 'var(--green)';
+    document.getElementById('resetBtn').style.display = 'none';
+  } else {
+    badge.textContent = '🟡 本地演示';
+    badge.classList.remove('live');
+    badge.style.display = '';
+    badge.title = '未连接采集后端，点击重试连接';
+  }
+}
+
+// ---- 多网段扫描（走后端 /api/discover）----
+let scanning = false;
+let scanResults = [];
+let scanSelected = new Set();
+let netInfoCache = null;
+
+async function loadNetInfo() {
+  if (LIVE.mode !== 'live' || netInfoCache) return;
+  try {
+    netInfoCache = await fetchJSON(LIVE.base + '/api/network-info', { timeoutMs: 3000 });
+  } catch (e) { netInfoCache = { subnets: [] }; }
+  renderScanQuick();
+}
+function renderScanQuick() {
+  const box = document.getElementById('scanQuick');
+  if (!netInfoCache || !netInfoCache.subnets || !netInfoCache.subnets.length) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  box.innerHTML = '本机网段快捷：' + netInfoCache.subnets.map(s =>
+    '<a class="scan-quick-chip" onclick="fillSubnet(\'' + escapeHtml(s.cidr) + '\')">' + escapeHtml(s.cidr) + '（' + escapeHtml(s.interface) + '）</a>'
+  ).join('');
+}
+function fillSubnet(cidr) {
+  const el = document.getElementById('scanSubnet');
+  const cur = el.value.trim();
+  if (cur && cur.split(/[,;\s]+/).includes(cidr)) return;
+  el.value = cur ? cur + ', ' + cidr : cidr;
+}
+
+async function scanNetwork() {
+  if (scanning) return;
+  const raw = document.getElementById('scanSubnet').value.trim();
+  if (!raw) { alert('请输入至少一个扫描目标（如 192.168.54.0/24，或用本机网段快捷按钮）'); return; }
+  scanning = true;
+  scanResults = [];
+  scanSelected = new Set();
+  const box = document.getElementById('scanResult');
+  box.style.display = 'block';
+  box.innerHTML = '<div style="font-size:12px;color:var(--text-sub);padding:8px;">⏳ 正在扫描：' + escapeHtml(raw) + '<br>过程含 ICMP 探测 + 端口指纹 + SNMP 识别，约需 10~30 秒…</div>';
+  try {
+    const community = document.getElementById('scanCommunity').value.trim();
+    const data = await fetchJSON(LIVE.base + '/api/discover', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subnets: raw, community: community || undefined }),
+      timeoutMs: 120000,
+    });
+    scanResults = data.found || [];
+    const dur = data.durationMs ? (data.durationMs / 1000).toFixed(1) + 's' : '';
+    const alive = data.alive != null ? data.alive : 0;
+    // 头部汇总 + 全选/批量添加
+    let summary = '<div class="scan-summary">扫描完成：存活 ' + alive + ' 台 · 发现疑似打印机 ' +
+      scanResults.length + ' 台' + (dur ? '（' + dur + '）' : '') + '。勾选后一键添加：' +
+      '<button class="btn btn-primary scan-batch-btn" id="scanAddBtn" onclick="batchAddSelected()">添加所选 (0)</button></div>';
+    if (!scanResults.length) {
+      const errs = (data.targets || []).filter(t => t.error).map(t => escapeHtml(t.input + '：' + t.error)).join('；');
+      box.innerHTML = summary + '<div style="font-size:12px;color:var(--text-sub);padding:8px;line-height:1.6;">' +
+        '没有发现可识别的打印机。<br>可能原因：① SNMP 团体名不是 public（在上方填写后重试）② 网络隔离了 UDP/161 ③ 打印机仅支持 IPP/WSD。' +
+        (errs ? '<br><br>⚠ 部分目标无效：' + errs : '') + '</div>';
+      return;
+    }
+    const rows = scanResults.map((d, i) => {
+      const tagCls = d.matchType === 'snmp' ? 'snmp' : 'ports';
+      const tagTxt = d.matchType === 'snmp' ? 'SNMP识别' : '端口指纹';
+      const monBadge = d.monitored ? '<span class="scan-tag mon">已监控</span>' : '';
+      const noteHtml = d.note ? '<div class="scan-note">⚠ ' + escapeHtml(d.note) + '</div>' : '';
+      const disabled = d.monitored ? 'disabled' : '';
+      const fill = d.monitored ? '' : '<span class="scan-fill-btn" onclick="event.stopPropagation();useScanResult(' + i + ')">手动填表</span>';
+      return '<label class="scan-item" style="' + (d.monitored ? 'opacity:.55;' : 'cursor:pointer;') + '">' +
+        '<input type="checkbox" ' + disabled + ' onchange="toggleScanCheck(' + i + ', this)">' +
+        '<b>' + d.ip + '</b>' +
+        '<div class="scan-info"><div class="scan-model">' + escapeHtml(d.model || '未知型号') + '</div>' + noteHtml + '</div>' +
+        '<span class="scan-tag ' + tagCls + '">' + tagTxt + '</span>' +
+        monBadge + fill +
+        '</label>';
+    }).join('');
+    box.innerHTML = summary + rows;
+  } catch (e) {
+    box.innerHTML = '<div style="font-size:12px;color:var(--red);padding:8px;">扫描失败：' + escapeHtml(e.message) + '</div>';
+  }
+  scanning = false;
+}
+
+function toggleScanCheck(i, el) {
+  if (el.checked) scanSelected.add(i); else scanSelected.delete(i);
+  updateScanSelBtn();
+}
+function updateScanSelBtn() {
+  const btn = document.getElementById('scanAddBtn');
+  if (!btn) return;
+  btn.textContent = '添加所选 (' + scanSelected.size + ')';
+  btn.disabled = scanSelected.size === 0;
+}
+
+async function batchAddSelected() {
+  const items = [...scanSelected].map(i => scanResults[i]).filter(Boolean);
+  if (!items.length) { alert('请先勾选要添加的打印机'); return; }
+  const btn = document.getElementById('scanAddBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '添加中…'; }
+  try {
+    const data = await fetchJSON(LIVE.base + '/api/printers/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        printers: items.map(d => ({ ip: d.ip, name: d.suggestedName || d.model || ('打印机 ' + d.ip), community: document.getElementById('scanCommunity').value.trim() || undefined }))
+      }),
+      timeoutMs: 20000,
+    });
+    const n = data.added.length;
+    let msg = '✓ 已添加 ' + n + ' 台打印机';
+    if (data.skipped && data.skipped.length) msg += '，跳过 ' + data.skipped.length + ' 台（重复/无效）';
+    showToast(msg);
+    scanSelected = new Set();
+    // 重新拉取最新快照
+    const snap = await tryFetchPrinters(LIVE.base);
+    if (snap) applyLiveData(snap);
+    closeAddModal();
+  } catch (e) {
+    showToast('✗ 批量添加失败：' + e.message);
+    if (btn) { btn.disabled = false; }
+  }
+}
+
+function useScanResult(i) {
+  const d = scanResults[i];
+  if (!d) return;
+  document.getElementById('fIp').value = d.ip;
+  if (d.model && d.model !== '未知型号') document.getElementById('fModel').value = d.model.slice(0, 40);
+  if (!document.getElementById('fName').value.trim()) document.getElementById('fName').value = (d.suggestedName || d.model || ('打印机 ' + d.ip)).slice(0, 20);
+  document.getElementById('scanResult').style.display = 'none';
+}
+
+// ==================== 添加/删除打印机 ====================
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+// ---- Toast 提示 ----
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ---- 添加打印机 ----
+function openAddModal() {
+  if (!window.__authed) { requireLogin(openAddModal); return; }
+  // 复位为"添加"模式
+  editTargetId = null;
+  document.querySelector('#addModalOverlay .modal-title').textContent = '＋ 添加打印机';
+  const submitBtn = document.getElementById('addModalSubmitBtn');
+  submitBtn.textContent = '确认添加';
+  submitBtn.disabled = false;
+  // 重置表单
+  ['fName','fModel','fLocation','fIp'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('fType').value = 'bw';
+  document.getElementById('fNetwork').value = 'Ethernet';
+  ['tBlack','tCyan','tMagenta','tYellow'].forEach(id => document.getElementById(id).value = 100);
+  document.getElementById('fDemo').checked = false;
+  document.getElementById('scanSubnet').value = '';
+  document.getElementById('scanCommunity').value = '';
+  document.getElementById('scanResult').style.display = 'none';
+  scanSelected = new Set();
+  // 实时模式才显示：网段扫描 + 模拟设备开关
+  document.getElementById('scanRow').style.display = (LIVE.mode === 'live') ? '' : 'none';
+  document.getElementById('demoRow').style.display = (LIVE.mode === 'live') ? '' : 'none';
+  toggleTonerInputs();
+  clearFormErrors();
+  if (LIVE.mode === 'live') loadNetInfo();
+  document.getElementById('addModalOverlay').classList.add('show');
+  setTimeout(() => document.getElementById('fName').focus(), 100);
+}
+
+// ---- 修改设备（复用添加弹窗）----
+function openEditModal(id, event) {
+  if (!window.__authed) { requireLogin(function () { openEditModal(id, event); }); return; }
+  if (event) event.stopPropagation();   // 防止触发行点击打开详情
+  const p = printers.find(x => x.id === id);
+  if (!p) return;
+  editTargetId = id;
+  // 切换为"修改"模式界面
+  document.querySelector('#addModalOverlay .modal-title').textContent = '✎ 修改设备';
+  const submitBtn = document.getElementById('addModalSubmitBtn');
+  submitBtn.textContent = '保存修改';
+  submitBtn.disabled = false;
+  // 预填当前设备信息
+  document.getElementById('fName').value = p.name;
+  document.getElementById('fModel').value = p.model || '';
+  document.getElementById('fLocation').value = p.location || '';
+  document.getElementById('fIp').value = p.ip;
+  document.getElementById('fType').value = p.isColor ? 'color' : 'bw';
+  document.getElementById('fNetwork').value = p.network || 'Ethernet';
+  document.getElementById('fDemo').checked = false;
+  document.getElementById('scanSubnet').value = '';
+  document.getElementById('scanCommunity').value = '';
+  document.getElementById('scanResult').style.display = 'none';
+  // 修改时隐藏扫描/模拟设备，真实设备墨粉由 SNMP 自动读取
+  document.getElementById('scanRow').style.display = 'none';
+  document.getElementById('demoRow').style.display = 'none';
+  toggleTonerInputs();
+  clearFormErrors();
+  document.getElementById('addModalOverlay').classList.add('show');
+  setTimeout(() => document.getElementById('fName').focus(), 100);
+}
+
+// 添加/修改统一提交入口
+function submitFormPrinter() {
+  if (editTargetId != null) return submitEditPrinter();
+  return submitAddPrinter();
+}
+
+// ---- 提交修改 ----
+async function submitEditPrinter() {
+  clearFormErrors();
+  const id = editTargetId;
+  const name = document.getElementById('fName').value.trim();
+  const model = document.getElementById('fModel').value.trim() || '未知型号';
+  const location = document.getElementById('fLocation').value.trim();
+  const ip = document.getElementById('fIp').value.trim();
+  const isColor = document.getElementById('fType').value === 'color';
+  const network = document.getElementById('fNetwork').value;
+
+  let valid = true;
+  if (!name) { showFormError('fName', 'errName'); valid = false; }
+  if (!location) { showFormError('fLocation', 'errLocation'); valid = false; }
+  if (!isValidIP(ip)) { showFormError('fIp', 'errIp'); valid = false; }
+  else if (printers.some(p => p.ip === ip && p.id !== id)) {
+    document.getElementById('errIp').textContent = '该IP地址已被其他打印机占用';
+    showFormError('fIp', 'errIp');
+    valid = false;
+  }
+  if (!valid) return;
+
+  const btn = document.getElementById('addModalSubmitBtn');
+  btn.disabled = true;
+  btn.textContent = '保存中…';
+  try {
+    if (LIVE.mode === 'live') {
+      await fetchJSON(LIVE.base + '/api/printers/' + id, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, model, location, ip, isColor, network }),
+        timeoutMs: 8000,
+      });
+      const snap = await tryFetchPrinters(LIVE.base);
+      if (snap) applyLiveData(snap);
+    } else {
+      const p = printers.find(x => x.id === id);
+      if (p) {
+        p.name = name; p.model = model; p.location = location; p.ip = ip;
+        p.isColor = isColor; p.network = network;
+      }
+      savePrinters();
+      renderAll();
+    }
+    closeAddModal();
+    showToast(`✓ 设备「${name}」已更新`);
+  } catch (e) {
+    if (e.status === 401) { requireLogin(function () { submitEditPrinter(); }); return; }
+    document.getElementById('errIp').textContent = e.message || '保存失败';
+    showFormError('fIp', 'errIp');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '保存修改';
+  }
+}
+
+function closeAddModal(e) {
+  if (e && e.target.id !== 'addModalOverlay') return;
+  document.getElementById('addModalOverlay').classList.remove('show');
+}
+
+function toggleTonerInputs() {
+  const isColor = document.getElementById('fType').value === 'color';
+  document.querySelectorAll('.color-only').forEach(el => el.style.display = isColor ? '' : 'none');
+  document.getElementById('tonerInputs').style.gridTemplateColumns = isColor ? 'repeat(4, 1fr)' : '1fr';
+  // 实时模式下：真实设备（未勾选模拟）由 SNMP 自动读取墨粉，隐藏手动输入
+  const demoChecked = !!(document.getElementById('fDemo') && document.getElementById('fDemo').checked);
+  const showToner = (LIVE.mode !== 'live') || demoChecked;
+  document.getElementById('tonerInputs').closest('.form-item').style.display = showToner ? '' : 'none';
+  document.getElementById('snmpHint').style.display = (LIVE.mode === 'live' && !demoChecked) ? '' : 'none';
+}
+
+function clearFormErrors() {
+  ['errName','errLocation','errIp'].forEach(id => document.getElementById(id).classList.remove('show'));
+  ['fName','fLocation','fIp'].forEach(id => document.getElementById(id).classList.remove('error'));
+  document.getElementById('errIp').textContent = '请输入合法的IP地址（如 192.168.1.100）';
+}
+
+function showFormError(inputId, errId) {
+  document.getElementById(inputId).classList.add('error');
+  document.getElementById(errId).classList.add('show');
+}
+
+function isValidIP(ip) {
+  if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(ip)) return false;
+  return ip.split('.').every(seg => Number(seg) >= 0 && Number(seg) <= 255);
+}
+
+async function submitAddPrinter() {
+  if (LIVE.mode === 'live') return submitAddPrinterLive();
+  clearFormErrors();
+  const name = document.getElementById('fName').value.trim();
+  const model = document.getElementById('fModel').value.trim() || '未知型号';
+  const location = document.getElementById('fLocation').value.trim();
+  const ip = document.getElementById('fIp').value.trim();
+  const isColor = document.getElementById('fType').value === 'color';
+  const network = document.getElementById('fNetwork').value;
+
+  // 校验
+  let valid = true;
+  if (!name) { showFormError('fName', 'errName'); valid = false; }
+  if (!location) { showFormError('fLocation', 'errLocation'); valid = false; }
+  if (!isValidIP(ip)) { showFormError('fIp', 'errIp'); valid = false; }
+  else if (printers.some(p => p.ip === ip)) {
+    document.getElementById('errIp').textContent = '该IP地址已被其他打印机占用';
+    showFormError('fIp', 'errIp');
+    valid = false;
+  }
+  if (!valid) return;
+
+  // 墨粉数值
+  const clamp = v => Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
+  const b = clamp(document.getElementById('tBlack').value);
+  const toners = isColor
+    ? [
+        {color:'black',label:'黑',value:b},
+        {color:'cyan',label:'青',value:clamp(document.getElementById('tCyan').value)},
+        {color:'magenta',label:'品红',value:clamp(document.getElementById('tMagenta').value)},
+        {color:'yellow',label:'黄',value:clamp(document.getElementById('tYellow').value)}
+      ]
+    : [{color:'black',label:'黑',value:b}];
+
+  const newId = Math.max(0, ...printers.map(p => p.id)) + 1;
+  const today = new Date().toISOString().slice(0, 10);
+  printers.push({
+    id: newId,
+    name: name,
+    model: model,
+    location: location,
+    ip: ip, status: 'online', isColor: isColor,
+    toners: toners, toner: Math.min(...toners.map(t => t.value)),
+    pages: 0, maxPages: isColor ? 50000 : 30000,
+    serial: 'SN-NEW-' + newId.toString().padStart(3, '0') + 'X',
+    installDate: today, lastMaintenance: today,
+    network: network, uptime: '0天0小时', temp: 30, firmware: 'v1.0.0'
+  });
+  savePrinters();
+  closeAddModal();
+  renderAll();
+  showToast(`✓ 打印机「${name}」添加成功`);
+}
+
+async function submitAddPrinterLive() {
+  clearFormErrors();
+  const name = document.getElementById('fName').value.trim();
+  const model = document.getElementById('fModel').value.trim() || '未知型号';
+  const location = document.getElementById('fLocation').value.trim() || '未知位置';
+  const ip = document.getElementById('fIp').value.trim();
+  const isColor = document.getElementById('fType').value === 'color';
+  const network = document.getElementById('fNetwork').value;
+  const demo = !!document.getElementById('fDemo').checked;
+
+  let valid = true;
+  if (!name) { showFormError('fName', 'errName'); valid = false; }
+  if (!isValidIP(ip)) { showFormError('fIp', 'errIp'); valid = false; }
+  if (!valid) return;
+
+  // 模拟设备才需要初始墨粉；真实设备由 SNMP 自动读取
+  const clamp = v => Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
+  const b = clamp(document.getElementById('tBlack').value);
+  const toners = isColor
+    ? [
+        {color:'black',label:'黑',value:b},
+        {color:'cyan',label:'青',value:clamp(document.getElementById('tCyan').value)},
+        {color:'magenta',label:'品红',value:clamp(document.getElementById('tMagenta').value)},
+        {color:'yellow',label:'黄',value:clamp(document.getElementById('tYellow').value)}
+      ]
+    : [{color:'black',label:'黑',value:b}];
+
+  const body = { name, model, location, ip, isColor, network, demo };
+  if (demo) body.toners = toners;
+
+  const btn = document.querySelector('#addModalOverlay .btn-primary');
+  btn.disabled = true;
+  btn.textContent = demo ? '添加中…' : '添加并探测中…';
+  try {
+    await fetchJSON(LIVE.base + '/api/printers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      timeoutMs: 8000,
+    });
+    closeAddModal();
+    const snap = await tryFetchPrinters(LIVE.base);
+    if (snap) applyLiveData(snap);
+    showToast(demo ? `✓ 模拟设备「${name}」已添加` : `✓ 「${name}」已添加，正在通过 SNMP 采集状态…`);
+  } catch (e) {
+    if (e.status === 401) { requireLogin(submitAddPrinterLive); return; }
+    document.getElementById('errIp').textContent = e.message || '添加失败';
+    showFormError('fIp', 'errIp');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '确认添加';
+  }
+}
+
+// ---- 删除打印机 ----
+let deleteTargetId = null;
+let editTargetId = null;   // 非 null 时，添加弹窗复用为"修改设备"模式
+
+function deletePrinter(id, e) {
+  if (!window.__authed) { requireLogin(function() { deletePrinter(id); }); return; }
+  if (e) e.stopPropagation(); // 防止触发行点击打开详情
+  const p = printers.find(x => x.id === id);
+  if (!p) return;
+  deleteTargetId = id;
+  document.getElementById('delConfirmText').innerHTML =
+    `将删除 <b>${escapeHtml(p.name)}</b><br>${escapeHtml(p.model)} · ${escapeHtml(p.location)} · ${p.ip}<br><span style="color:var(--red);">删除后无法恢复</span>`;
+  document.getElementById('delModalOverlay').classList.add('show');
+}
+
+function deleteFromDetail() {
+  if (!window.__authed) { requireLogin(deleteFromDetail); return; }
+  const id = currentDetailId;
+  closeModal();
+  if (id != null) deletePrinter(id);
+}
+
+async function confirmDelete() {
+  if (LIVE.mode === 'live') {
+    const p = printers.find(x => x.id === deleteTargetId);
+    const name = p ? p.name : '';
+    try {
+      await fetchJSON(LIVE.base + '/api/printers/' + deleteTargetId, { method: 'DELETE', timeoutMs: 8000 });
+      closeDelModal();
+      const snap = await tryFetchPrinters(LIVE.base);
+      if (snap) applyLiveData(snap);
+      showToast(`🗑 打印机「${name}」已删除`);
+    } catch (e) {
+      if (e.status === 401) { requireLogin(confirmDelete); return; }
+      closeDelModal();
+      showToast('删除失败：' + e.message);
+    }
+    return;
+  }
+  const idx = printers.findIndex(x => x.id === deleteTargetId);
+  if (idx > -1) {
+    const name = printers[idx].name;
+    printers.splice(idx, 1);
+    savePrinters();
+    renderAll();
+    showToast(`🗑 打印机「${name}」已删除`);
+  }
+  closeDelModal();
+}
+
+function closeDelModal(e) {
+  if (e && e.target.id !== 'delModalOverlay') return;
+  document.getElementById('delModalOverlay').classList.remove('show');
+  deleteTargetId = null;
+}
+
+// ==================== 批量删除 ====================
+function onRowCheck(id, el) {
+  if (el.checked) selectedIds.add(id);
+  else selectedIds.delete(id);
+  updateBatchUI();
+}
+function toggleSelectAll(el) {
+  const list = getFiltered();
+  if (el.checked) list.forEach(p => selectedIds.add(p.id));
+  else list.forEach(p => selectedIds.delete(p.id));
+  renderTable();   // 同步行内复选框
+  updateBatchUI();
+}
+function updateBatchUI() {
+  const n = selectedIds.size;
+  document.getElementById('selCount').textContent = n;
+  document.getElementById('batchDelBtn').style.display = (window.__authed && n > 0) ? '' : 'none';
+  const sa = document.getElementById('selectAll');
+  if (sa) {
+    const list = getFiltered();
+    sa.checked = list.length > 0 && list.every(p => selectedIds.has(p.id));
+  }
+}
+function openBatchDelete() {
+  if (!window.__authed) { requireLogin(openBatchDelete); return; }
+  if (!selectedIds.size) return;
+  const names = printers.filter(p => selectedIds.has(p.id)).map(p => escapeHtml(p.name));
+  document.getElementById('batchDelCount').textContent = selectedIds.size;
+  document.getElementById('batchDelText').innerHTML =
+    `将删除选中的 <b>${selectedIds.size}</b> 台打印机：<br><div style="max-height:160px;overflow:auto;margin-top:6px;text-align:left;">` +
+    names.map(n => '• ' + n).join('<br>') +
+    `</div><span style="color:var(--red);display:block;margin-top:8px;">删除后无法恢复</span>`;
+  document.getElementById('batchDelModalOverlay').classList.add('show');
+}
+async function confirmBatchDelete() {
+  const ids = [...selectedIds];
+  if (!ids.length) return;
+  if (LIVE.mode === 'live') {
+    try {
+      await fetchJSON(LIVE.base + '/api/printers/batch-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+        timeoutMs: 15000,
+      });
+      selectedIds.clear();
+      closeBatchDelModal();
+      const snap = await tryFetchPrinters(LIVE.base);
+      if (snap) applyLiveData(snap);
+      showToast(`🗑 已批量删除 ${ids.length} 台打印机`);
+    } catch (e) {
+      closeBatchDelModal();
+      showToast('批量删除失败：' + e.message);
+    }
+    return;
+  }
+  // 本地模式
+  printers = printers.filter(p => !selectedIds.has(p.id));
+  savePrinters();
+  selectedIds.clear();
+  closeBatchDelModal();
+  renderAll();
+  showToast(`🗑 已批量删除 ${ids.length} 台打印机`);
+}
+function closeBatchDelModal(e) {
+  if (e && e.target.id !== 'batchDelModalOverlay') return;
+  document.getElementById('batchDelModalOverlay').classList.remove('show');
+}
+
+// ---- 数据持久化（localStorage，仅本地演示模式） ----
+function savePrinters() {
+  if (LIVE.mode === 'live') return; // 实时模式由后端管理数据
+  try { localStorage.setItem('printerMonitorData', JSON.stringify(printers)); } catch (err) {}
+}
+function loadPrinters() {
+  try {
+    const s = localStorage.getItem('printerMonitorData');
+    if (s) printers = JSON.parse(s);
+  } catch (err) {}
+}
+function resetDemoData() {
+  if (LIVE.mode === 'live') { showToast('实时模式下请直接在面板中管理设备'); return; }
+  if (confirm('确定要清空本地数据吗？\n所有本地添加的打印机将被删除（不会删除 SNMP 后端设备）。')) {
+    try { localStorage.removeItem('printerMonitorData'); } catch (err) {}
+    location.reload();
+  }
+}
+
+// ==================== 键盘ESC关闭弹窗 ====================
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeModal();
+    closeAddModal();
+    closeDelModal();
+  }
+});
+
+// ==================== 登录态（公开只读 + 写操作按需登录） ====================
+window.__authed = false;
+window.__username = null;
+let pendingLoginAction = null;
+
+function requireLogin(after) {
+  pendingLoginAction = after || null;
+  const err = document.getElementById('loginError');
+  if (err) err.textContent = '';
+  const pw = document.getElementById('loginPass');
+  if (pw) pw.value = '';
+  document.getElementById('loginOverlay').style.display = 'flex';
+  setTimeout(function() { const u = document.getElementById('loginUser'); if (u) u.focus(); }, 50);
+}
+function logoLoginClick() {
+  if (window.__authed) return;   // 已登录不弹，避免误触
+  requireLogin();                // 访客点击 png 图标 → 弹出登录窗口
+}
+function closeLogin(e) {
+  if (e && e.target && e.target.id !== 'loginOverlay') return;
+  document.getElementById('loginOverlay').style.display = 'none';
+  pendingLoginAction = null;
+}
+async function submitLogin() {
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value;
+  const err = document.getElementById('loginError');
+  try {
+    const r = await fetchJSON('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u, password: p }),
+    });
+    window.__authed = true;
+    window.__username = r.username || 'admin';
+    updateAuthBadge();
+    document.getElementById('loginOverlay').style.display = 'none';
+    const fn = pendingLoginAction;
+    pendingLoginAction = null;
+    // 登录后以管理员视角重新拉取数据（含静音区），确保界面即时刷新
+    try { const snap = await tryFetchPrinters(LIVE.base); if (snap) applyLiveData(snap); } catch (e) {}
+    if (typeof fn === 'function') fn();
+  } catch (e) {
+    if (err) err.textContent = (e && e.message) || '登录失败';
+  }
+}
+async function logout() {
+  try { await fetchJSON('/api/logout', { method: 'POST' }); } catch (e) {}
+  window.__authed = false;
+  window.__username = null;
+  updateAuthBadge();
+  showToast('已退出登录');
+  // 退出后以访客视角重新拉取，静音区即时隐藏
+  try { const snap = await tryFetchPrinters(LIVE.base); if (snap) applyLiveData(snap); } catch (e) {}
+}
+function updateAuthBadge() {
+  const el = document.getElementById('authBadge');
+  if (window.__authed) {
+    document.body.classList.add('authed');   // 显示所有 .auth-only 操作元素
+    if (el) {
+      el.style.display = '';
+      el.innerHTML = '👤 ' + escapeHtml(window.__username || 'admin') + ' · <a href="javascript:logout()" style="color:#fff;text-decoration:underline;margin-left:4px;">退出</a>';
+    }
+  } else {
+    document.body.classList.remove('authed'); // 访客：隐藏所有 .auth-only 操作元素
+    if (el) el.style.display = 'none';
+  }
+}
+function doSendAlert(p) {
+  if (!p) return;
+  alert('已为「' + p.name + '」发送告警通知至运维团队\n设备位置：' + p.location + '\nIP：' + p.ip);
+}
+
+// ==================== 初始化 ====================
+(async function init() {
+  // 探测登录态（公开只读，写操作按需弹出登录框）
+  try { const me = await fetchJSON('/api/me'); window.__authed = !!me.authed; window.__username = me.username || null; } catch (e) {}
+  updateAuthBadge();
+  // 先探测 SNMP 采集后端（同源 / localhost:8899）
+  const connected = await connectLive(false);
+  if (!connected) {
+    // 未连接后端 → 本地空列表（已移除预置演示数据，并清除浏览器旧缓存）
+    try { localStorage.removeItem('printerMonitorData'); } catch (e) {}
+    loadPrinters();
+    renderAll();
+    updateSrcBadge(null);
+    const now0 = new Date();
+    document.getElementById('liveTime').textContent = `最后更新 ${now0.getHours().toString().padStart(2,'0')}:${now0.getMinutes().toString().padStart(2,'0')}:${now0.getSeconds().toString().padStart(2,'0')}`;
+    // 每30秒本地模拟波动
+    setInterval(() => { refreshData(); }, 30000);
+  } else {
+    // 实时模式：每15秒拉取后端快照
+    setInterval(async () => {
+      const snap = await tryFetchPrinters(LIVE.base);
+      if (snap) applyLiveData(snap);
+    }, 15000);
+    // 每60秒重试连接（后端可能重启换了端口等）
+    setInterval(async () => {
+      if (LIVE.mode !== 'live') {
+        const ok = await connectLive(false);
+        if (!ok) updateSrcBadge(null);
+      }
+    }, 60000);
+  }
+})();
+</script>
+</body>
+</html>

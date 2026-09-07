@@ -1,0 +1,19 @@
+{
+  "name": "printer-monitor",
+  "version": "2.0.0",
+  "description": "打印机 SNMP 实时监控平台 — 墨粉/纸张/状态/卡纸缺纸告警，Web 面板集中管理",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["printer", "snmp", "monitor", "toner", "alert"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "net-snmp": "^3.26.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

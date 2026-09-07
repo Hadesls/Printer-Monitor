@@ -1,0 +1,13 @@
+{
+  "community": "public",
+  "pollIntervalSec": 10,
+  "port": 8899,
+  "printers": [
+    {
+      "name": "演示打印机(模拟)",
+      "ip": "127.0.0.1",
+      "location": "演示",
+      "demo": true
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+# 依赖（随包已提供离线副本；如需精简仓库可删除 node_modules 后依赖 npm install net-snmp）
+node_modules/
+
+# 运行期生成的真实配置与密钥（含真实打印机 IP / 账户哈希，勿提交）
+printers.json
+.admin-password.txt
+
+# 日志与系统文件
+*.log
+.DS_Store
+Thumbs.db
