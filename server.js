@@ -76,7 +76,24 @@ const OID = {
 };
 
 // ==================== 配置 ====================
-let config = { community: 'public', pollIntervalSec: 10, port: 8899, printers: [], dismissedAlerts: {}, dismissHours: 1, alertSince: {} };
+let config = { community: 'public', pollIntervalSec: 10, port: 8899, printers: [], dismissedAlerts: {}, dismissHours: 1, alertSince: {}, zoneConfig: null };
+
+// ==================== 区域规则（用户可自定义） ====================
+// 按 IP 前缀映射到区域名，从上到下匹配、第一个命中生效；可在面板「⚙ 区域设置」里增删改。
+const DEFAULT_ZONE_RULES = [{ prefix: '10.', label: '办公区' }, { prefix: '192.', label: '实验区' }];
+function normalizeZoneConfig(z) {
+  const src = (z && typeof z === 'object') ? z : {};
+  let rules = Array.isArray(src.rules) ? src.rules.map(r => ({
+    prefix: String((r && r.prefix) || '').trim(),
+    label: String((r && r.label) || '').trim()
+  })).filter(r => r.prefix && r.label) : [];
+  if (!rules.length) rules = DEFAULT_ZONE_RULES.map(r => ({ prefix: r.prefix, label: r.label }));
+  return {
+    enabled: src.enabled !== false,                                   // false = 整块隐藏区域
+    rules: rules,
+    fallback: String(src.fallback || '其他').trim() || '其他'           // 未匹配时的默认区域名
+  };
+}
 function loadConfig() {
   const candidates = resolveConfigPath();
   for (const cp of candidates) {
@@ -95,11 +112,13 @@ function loadConfig() {
       }
       if (typeof config.dismissHours !== 'number' || config.dismissHours <= 0) config.dismissHours = 1;
       if (!config.alertSince || typeof config.alertSince !== 'object') config.alertSince = {};
+      config.zoneConfig = normalizeZoneConfig(config.zoneConfig);
       return;
     } catch (e) { /* try next */ }
   }
   console.log('[配置] printers.json 不存在或损坏，使用空配置（将写入:', candidates[0], '）');
   config.printers = [];
+  config.zoneConfig = normalizeZoneConfig(null);
   CONFIG_PATH = candidates[0];
 }
 function saveConfig() {
@@ -719,13 +738,16 @@ function readBody(req) {
     req.on('end', () => { try { resolve(d ? JSON.parse(d) : {}); } catch (e) { resolve(null); } });
   });
 }
-// 根据 IP 首段划分区域：10.* → 办公区，192.* → 实验区，其余 → 其他
+// 按「⚙ 区域设置」里的规则（IP 前缀 → 区域名）计算区域；未匹配则用默认名
 function zoneOf(ip) {
-  if (!ip) return '其他';
-  const first = String(ip).split('.')[0];
-  if (first === '10') return '办公区';
-  if (first === '192') return '实验区';
-  return '其他';
+  const zc = config.zoneConfig || normalizeZoneConfig(null);
+  if (!ip) return zc.fallback;
+  const s = String(ip).trim();
+  for (const r of zc.rules) {
+    const p = r.prefix;
+    if (s === p || s.startsWith(p.endsWith('.') ? p : p + '.')) return r.label;
+  }
+  return zc.fallback;
 }
 
 // 由设备当前状态生成分类告警（排除已屏蔽设备与已清理的告警）
@@ -810,6 +832,7 @@ function snapshot(authed) {
     updatedAt: new Date().toISOString(),
     pollIntervalSec: config.pollIntervalSec,
     printers: config.printers.map(p => Object.assign({}, p, { zone: zoneOf(p.ip) })),
+    zoneConfig: config.zoneConfig,
     alerts: computeAlerts(),
     totalPages: config.printers.reduce((s, p) => s + (Number(p.pages) || 0), 0),
   };
@@ -827,7 +850,8 @@ const server = http.createServer(async (req, res) => {
   // ---- 登录认证门禁 ----
   // 公开只读：登录页、登录/健康检查/登录态探测接口、以及所有读接口与仪表盘首页
   const isRead = (pathn === '/api/printers' && req.method === 'GET')
-              || (pathn === '/api/network-info' && req.method === 'GET');
+              || (pathn === '/api/network-info' && req.method === 'GET')
+              || (pathn === '/api/zone-config' && req.method === 'GET');
   const STATIC_EXT = ['.ico', '.png', '.jpg', '.jpeg', '.svg', '.css', '.js', '.json', '.woff2'];
   const isStaticAsset = STATIC_EXT.includes(path.extname(pathn).toLowerCase());
   const isPublic = pathn === '/login' || pathn === '/api/login' || pathn === '/api/health' || pathn === '/api/me'
@@ -881,6 +905,21 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathn === '/api/printers' && req.method === 'GET') return json(res, 200, snapshot(authEnabled() ? !!getSession(req) : true));
+
+  // 区域设置：GET 公开读（面板渲染需要）；PUT 需登录（属于写操作，走统一门禁）
+  if (pathn === '/api/zone-config' && req.method === 'GET') return json(res, 200, config.zoneConfig);
+  if (pathn === '/api/zone-config' && req.method === 'PUT') {
+    const b = await readBody(req);
+    if (!b || typeof b !== 'object') return json(res, 400, { error: '请求体格式错误' });
+    if (b.enabled !== undefined && typeof b.enabled !== 'boolean') return json(res, 400, { error: 'enabled 必须是布尔值' });
+    if (b.rules !== undefined && !Array.isArray(b.rules)) return json(res, 400, { error: 'rules 必须是数组' });
+    if (Array.isArray(b.rules) && b.rules.length > 50) return json(res, 400, { error: '区域规则最多 50 条' });
+    const bad = (b.rules || []).find(r => !r || !String(r.prefix || '').trim() || !String(r.label || '').trim());
+    if (bad) return json(res, 400, { error: '每条规则都需要填写 IP 前缀和区域名称' });
+    config.zoneConfig = normalizeZoneConfig(b);
+    saveConfig();
+    return json(res, 200, { ok: true, zoneConfig: config.zoneConfig });
+  }
 
   if (pathn === '/api/printers' && req.method === 'POST') {
     const b = await readBody(req);
