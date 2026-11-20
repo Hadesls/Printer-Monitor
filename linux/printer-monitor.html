@@ -843,6 +843,13 @@ table.printer-table {
             <option value="USB">USB</option>
           </select>
         </div>
+        <div class="form-item full">
+          <label class="form-label">SNMP 团体名</label>
+          <input type="text" class="form-input" id="fCommunity" placeholder="留空 = 使用全局默认（一般就是 public）" maxlength="32">
+          <div style="font-size:12px;color:var(--text-sub);margin-top:4px;line-height:1.6;">
+            绝大多数打印机用 <b>public</b>，<b>不用填</b>。只有当这台机器的团体名和全局默认不一样时，才在这里单独填 —— 填了就只对这台生效。
+          </div>
+        </div>
         <div class="form-item full" id="scanRow" style="display:none;">
           <label class="form-label">🔍 自动发现（多网段扫描）</label>
           <div style="display:flex;gap:8px;">
@@ -1468,6 +1475,7 @@ function openModal(id) {
       <div class="detail-item"><div class="detail-label">IP地址</div><div class="detail-value" style="font-family:monospace;">${p.ip}</div></div>
       <div class="detail-item"><div class="detail-label">序列号</div><div class="detail-value" style="font-family:monospace;font-size:13px;">${p.serial}</div></div>
       ${window.__authed ? `<div class="detail-item"><div class="detail-label">网络连接</div><div class="detail-value">${escapeHtml(p.network)}</div></div>` : ''}
+      ${window.__authed ? `<div class="detail-item"><div class="detail-label">SNMP 团体名</div><div class="detail-value" style="font-family:monospace;">${escapeHtml(p.community || window.__defaultCommunity || 'public')}<span style="font-family:inherit;color:var(--text-sub);font-size:12px;font-weight:400;"> ${p.community ? '（本机单独设置）' : '（全局默认）'}</span></div></div>` : ''}
     </div>
     <div class="detail-section-title">墨粉详情</div>
     ${tonerDetail}
@@ -1597,6 +1605,7 @@ function applyLiveData(data) {
   window.__alerts = data.alerts || [];
   window.__mutedDevices = data.suppressedDevices || [];
   window.__mutedAlerts = data.permanentMutedAlerts || [];
+  window.__defaultCommunity = data.defaultCommunity || 'public';   // 全局默认团体名（仅登录后下发）
   if (data.zoneConfig) applyZoneConfig(data.zoneConfig);
   renderAll();
   updateSrcBadge(data.updatedAt);
@@ -1782,7 +1791,7 @@ function openAddModal() {
   submitBtn.textContent = '确认添加';
   submitBtn.disabled = false;
   // 重置表单
-  ['fName','fModel','fLocation','fIp'].forEach(id => document.getElementById(id).value = '');
+  ['fName','fModel','fLocation','fIp','fCommunity'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('fType').value = 'bw';
   document.getElementById('fNetwork').value = 'Ethernet';
   ['tBlack','tCyan','tMagenta','tYellow'].forEach(id => document.getElementById(id).value = 100);
@@ -1818,6 +1827,7 @@ function openEditModal(id, event) {
   document.getElementById('fModel').value = p.model || '';
   document.getElementById('fLocation').value = p.location || '';
   document.getElementById('fIp').value = p.ip;
+  document.getElementById('fCommunity').value = p.community || '';
   document.getElementById('fType').value = p.isColor ? 'color' : 'bw';
   document.getElementById('fNetwork').value = p.network || 'Ethernet';
   document.getElementById('fDemo').checked = false;
@@ -1849,6 +1859,7 @@ async function submitEditPrinter() {
   const ip = document.getElementById('fIp').value.trim();
   const isColor = document.getElementById('fType').value === 'color';
   const network = document.getElementById('fNetwork').value;
+  const community = document.getElementById('fCommunity').value.trim();
 
   let valid = true;
   if (!name) { showFormError('fName', 'errName'); valid = false; }
@@ -1869,7 +1880,7 @@ async function submitEditPrinter() {
       await fetchJSON(LIVE.base + '/api/printers/' + id, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, model, location, ip, isColor, network }),
+        body: JSON.stringify({ name, model, location, ip, isColor, network, community: community || null }),
         timeoutMs: 8000,
       });
       const snap = await tryFetchPrinters(LIVE.base);
@@ -1989,6 +2000,7 @@ async function submitAddPrinterLive() {
   const ip = document.getElementById('fIp').value.trim();
   const isColor = document.getElementById('fType').value === 'color';
   const network = document.getElementById('fNetwork').value;
+  const community = document.getElementById('fCommunity').value.trim();
   const demo = !!document.getElementById('fDemo').checked;
 
   let valid = true;
@@ -2009,6 +2021,7 @@ async function submitAddPrinterLive() {
     : [{color:'black',label:'黑',value:b}];
 
   const body = { name, model, location, ip, isColor, network, demo };
+  if (community) body.community = community;
   if (demo) body.toners = toners;
 
   const btn = document.querySelector('#addModalOverlay .btn-primary');
