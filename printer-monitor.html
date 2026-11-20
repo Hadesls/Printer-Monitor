@@ -194,6 +194,10 @@ body {
 .auth-only { display: none; }
 body.authed .auth-only { display: inline-block; }
 body.authed th.auth-only, body.authed td.auth-only { display: table-cell; }
+/* 区域关闭时：筛选条、表格区域列、详情区域行整块隐藏 */
+body.zone-off .zone-chips,
+body.zone-off .col-zone,
+body.zone-off .zone-ui { display: none !important; }
 .icon-btn { border: 0; background: #eef2f7; color: #3b6fb0; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 14px; margin-right: 6px; }
 .icon-btn:hover { background: #dbe6f3; }
 /* 分页 */
@@ -697,6 +701,7 @@ table.printer-table {
           <div class="panel-title">设备列表</div>
           <div class="filter-bar">
             <button class="add-btn auth-only" onclick="openAddModal()">＋ 添加打印机</button>
+            <button class="btn btn-secondary auth-only" onclick="openZoneModal()" title="自定义区域名称，或关闭区域显示">⚙ 区域设置</button>
             <button class="btn btn-danger batch-del-btn auth-only" id="batchDelBtn" onclick="openBatchDelete()" style="display:none;">🗑 批量删除(<span id="selCount">0</span>)</button>
             <input type="text" class="search-input" id="searchInput" placeholder="搜索名称/型号/IP..." oninput="renderTable()">
             <div class="filter-chips" id="filterChips">
@@ -705,11 +710,7 @@ table.printer-table {
               <span class="chip" data-filter="warn" onclick="setFilter('warn')">墨粉不足</span>
               <span class="chip" data-filter="offline" onclick="setFilter('offline')">离线</span>
             </div>
-            <div class="filter-chips zone-chips" id="zoneChips">
-              <span class="chip active" data-zone="all" onclick="setZone('all')">全部区域</span>
-              <span class="chip" data-zone="office" onclick="setZone('office')">🏢 办公区</span>
-              <span class="chip" data-zone="lab" onclick="setZone('lab')">🔬 实验区</span>
-            </div>
+            <div class="filter-chips zone-chips" id="zoneChips"></div>
           </div>
         </div>
         <div class="table-wrap">
@@ -719,7 +720,7 @@ table.printer-table {
                 <th class="col-select">#<br><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)" title="全选当前页"></th>
                 <th onclick="sortTable('name')">打印机</th>
                 <th onclick="sortTable('location')">位置</th>
-                <th onclick="sortTable('zone')">区域</th>
+                <th class="col-zone" onclick="sortTable('zone')">区域</th>
                 <th onclick="sortTable('ip')">IP地址</th>
                 <th onclick="sortTable('status')">状态</th>
                 <th onclick="sortTable('toner')">墨粉余量</th>
@@ -879,6 +880,35 @@ table.printer-table {
   </div>
 </div>
 
+<!-- 区域设置弹窗 -->
+<div class="modal-overlay" id="zoneModalOverlay" onclick="closeZoneModal(event)">
+  <div class="modal" style="width:580px;" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">⚙ 区域设置</div>
+      <button class="modal-close" onclick="closeZoneModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:13px;cursor:pointer;">
+        <input type="checkbox" id="zoneEnabled">
+        <span>显示「区域」（不勾选则整块隐藏：列表列、筛选条、详情都不显示）</span>
+      </label>
+      <div style="font-size:12px;color:var(--text-sub);margin-bottom:8px;line-height:1.6;">
+        按 IP 前缀划分区域，<b>从上到下匹配，第一条命中即生效</b>。例如 <code>10.</code> → 办公区、<code>192.168.</code> → 实验区。
+      </div>
+      <div id="zoneRuleList"></div>
+      <button type="button" class="btn btn-secondary" style="margin-top:4px;" onclick="addZoneRule()">＋ 添加区域</button>
+      <div class="form-item" style="margin-top:16px;">
+        <label class="form-label">未匹配任何前缀时的默认区域名</label>
+        <input type="text" class="form-input" id="zoneFallback" maxlength="20" placeholder="如：其他">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeZoneModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveZoneConfig()">保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- 删除确认弹窗 -->
 <div class="modal-overlay" id="delModalOverlay" onclick="closeDelModal(event)">
   <div class="modal" style="width:420px;" onclick="event.stopPropagation()">
@@ -990,10 +1020,8 @@ function getFiltered() {
     list = list.filter(p => p.jam);
   }
   // 区域筛选
-  if (currentZone === 'office') {
-    list = list.filter(p => p.zone === '办公区');
-  } else if (currentZone === 'lab') {
-    list = list.filter(p => p.zone === '实验区');
+  if (currentZone && currentZone !== 'all') {
+    list = list.filter(p => p.zone === currentZone);
   }
   // 搜索
   const q = document.getElementById('searchInput').value.toLowerCase().trim();
@@ -1041,7 +1069,8 @@ function renderTable() {
   const list = all.slice(start, start + pageSize);
   const tbody = document.getElementById('printerTbody');
   if (total === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray);">没有匹配的打印机</td></tr>';
+    const cols = document.body.classList.contains('zone-off') ? 8 : 9;
+    tbody.innerHTML = '<tr><td colspan="' + cols + '" style="text-align:center;padding:40px;color:var(--gray);">没有匹配的打印机</td></tr>';
     renderPagination(total, pages);
     return;
   }
@@ -1075,7 +1104,7 @@ function renderTable() {
         <div class="printer-model">${escapeHtml(p.model)}</div>
       </td>
       <td>${escapeHtml(p.location)}</td>
-      <td><span class="zone-badge ${zoneClass(p.zone)}">${p.zone}</span></td>
+      <td class="col-zone"><span class="zone-badge ${zoneClass(p.zone)}">${escapeHtml(p.zone || '—')}</span></td>
       <td class="ip-text">${p.ip}</td>
       <td><span class="badge ${st.class}">${st.label}</span></td>
       <td class="toner-cell">${tonerHTML}</td>
@@ -1288,10 +1317,105 @@ function setFilter(f) {
   renderTable();
 }
 function setZone(z) {
-  currentZone = z;
-  document.querySelectorAll('#zoneChips .chip').forEach(c => c.classList.remove('active'));
-  document.querySelector(`#zoneChips .chip[data-zone="${z}"]`).classList.add('active');
+  currentZone = z || 'all';
+  document.querySelectorAll('#zoneChips .chip').forEach(c => c.classList.toggle('active', c.dataset.zone === currentZone));
   renderTable();
+}
+
+// ==================== 区域设置（用户可自定义显示/名称） ====================
+function applyZoneConfig(zc) {
+  window.__zoneConfig = zc || { enabled: true, rules: [], fallback: '其他' };
+  const on = window.__zoneConfig.enabled !== false;
+  document.body.classList.toggle('zone-off', !on);
+  if (!on) currentZone = 'all';          // 关闭区域时清掉筛选，避免列表被隐藏条件卡住
+  renderZoneChips();
+}
+
+function renderZoneChips() {
+  const el = document.getElementById('zoneChips');
+  if (!el) return;
+  const labels = [];
+  const seen = new Set();
+  (printers || []).forEach(p => {
+    if (p.zone && !seen.has(p.zone)) { seen.add(p.zone); labels.push(p.zone); }
+  });
+  const zc = window.__zoneConfig;
+  if (!labels.length && zc && Array.isArray(zc.rules)) {
+    zc.rules.forEach(r => { if (r.label && !seen.has(r.label)) { seen.add(r.label); labels.push(r.label); } });
+  }
+  if (currentZone !== 'all' && !seen.has(currentZone)) currentZone = 'all';
+  el.innerHTML =
+    '<span class="chip ' + (currentZone === 'all' ? 'active' : '') + '" data-zone="all" onclick="setZone(\'all\')">全部区域</span>' +
+    labels.map(l =>
+      '<span class="chip ' + (currentZone === l ? 'active' : '') + '" data-zone="' + escapeHtml(l) + '" onclick="setZone(this.dataset.zone)">' + escapeHtml(l) + '</span>'
+    ).join('');
+}
+
+function zoneRuleRow(prefix, label) {
+  const row = document.createElement('div');
+  row.className = 'zone-rule-row';
+  row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:8px;';
+  row.innerHTML =
+    '<input type="text" class="form-input zr-prefix" placeholder="IP 前缀，如 10." maxlength="18" style="flex:1;">' +
+    '<span style="color:var(--text-sub);">→</span>' +
+    '<input type="text" class="form-input zr-label" placeholder="区域名称，如 办公区" maxlength="20" style="flex:1.4;">' +
+    '<button type="button" class="icon-btn" title="删除此条" style="color:var(--red);">✕</button>';
+  row.querySelector('.zr-prefix').value = prefix || '';
+  row.querySelector('.zr-label').value = label || '';
+  row.querySelector('button').onclick = function () { row.remove(); };
+  return row;
+}
+
+function openZoneModal() {
+  if (!window.__authed) { requireLogin(openZoneModal); return; }
+  const zc = window.__zoneConfig || {};
+  document.getElementById('zoneEnabled').checked = zc.enabled !== false;
+  document.getElementById('zoneFallback').value = zc.fallback || '其他';
+  const rules = (Array.isArray(zc.rules) && zc.rules.length)
+    ? zc.rules
+    : [{ prefix: '10.', label: '办公区' }, { prefix: '192.', label: '实验区' }];
+  const list = document.getElementById('zoneRuleList');
+  list.innerHTML = '';
+  rules.forEach(r => list.appendChild(zoneRuleRow(r.prefix, r.label)));
+  document.getElementById('zoneModalOverlay').classList.add('show');
+}
+
+function closeZoneModal(e) {
+  if (e && e.target.id !== 'zoneModalOverlay') return;
+  document.getElementById('zoneModalOverlay').classList.remove('show');
+}
+
+function addZoneRule() {
+  document.getElementById('zoneRuleList').appendChild(zoneRuleRow('', ''));
+}
+
+async function saveZoneConfig() {
+  const rules = [];
+  document.querySelectorAll('#zoneRuleList .zone-rule-row').forEach(row => {
+    const prefix = row.querySelector('.zr-prefix').value.trim();
+    const label = row.querySelector('.zr-label').value.trim();
+    if (prefix && label) rules.push({ prefix: prefix, label: label });
+  });
+  const payload = {
+    enabled: document.getElementById('zoneEnabled').checked,
+    rules: rules,
+    fallback: document.getElementById('zoneFallback').value.trim() || '其他'
+  };
+  try {
+    const r = await fetchJSON(LIVE.base + '/api/zone-config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (r && r.zoneConfig) applyZoneConfig(r.zoneConfig);
+    closeZoneModal();
+    showToast('区域设置已保存');
+    const snap = await tryFetchPrinters(LIVE.base);
+    if (snap) applyLiveData(snap);
+  } catch (err) {
+    if (err && err.status === 401) { requireLogin(openZoneModal); return; }
+    showToast('保存失败：' + ((err && err.message) || err));
+  }
 }
 
 // ==================== 排序 ====================
@@ -1340,7 +1464,7 @@ function openModal(id) {
       <div class="detail-item"><div class="detail-label">设备型号</div><div class="detail-value">${escapeHtml(p.model)}</div></div>
       <div class="detail-item"><div class="detail-label">设备状态</div><div class="detail-value"><span class="badge ${st.class}">${st.label}</span></div></div>
       <div class="detail-item"><div class="detail-label">位置</div><div class="detail-value">${escapeHtml(p.location)}</div></div>
-      <div class="detail-item"><div class="detail-label">区域</div><div class="detail-value"><span class="zone-badge ${zoneClass(p.zone)}">${p.zone}</span></div></div>
+      <div class="detail-item zone-ui"><div class="detail-label">区域</div><div class="detail-value"><span class="zone-badge ${zoneClass(p.zone)}">${escapeHtml(p.zone || '—')}</span></div></div>
       <div class="detail-item"><div class="detail-label">IP地址</div><div class="detail-value" style="font-family:monospace;">${p.ip}</div></div>
       <div class="detail-item"><div class="detail-label">序列号</div><div class="detail-value" style="font-family:monospace;font-size:13px;">${p.serial}</div></div>
       ${window.__authed ? `<div class="detail-item"><div class="detail-label">网络连接</div><div class="detail-value">${escapeHtml(p.network)}</div></div>` : ''}
@@ -1473,6 +1597,7 @@ function applyLiveData(data) {
   window.__alerts = data.alerts || [];
   window.__mutedDevices = data.suppressedDevices || [];
   window.__mutedAlerts = data.permanentMutedAlerts || [];
+  if (data.zoneConfig) applyZoneConfig(data.zoneConfig);
   renderAll();
   updateSrcBadge(data.updatedAt);
 }
@@ -2162,6 +2287,7 @@ function doSendAlert(p) {
     // 未连接后端 → 本地空列表（已移除预置演示数据，并清除浏览器旧缓存）
     try { localStorage.removeItem('printerMonitorData'); } catch (e) {}
     loadPrinters();
+    applyZoneConfig({ enabled: false });   // 无后端时没有区域数据，整块隐藏
     renderAll();
     updateSrcBadge(null);
     const now0 = new Date();
