@@ -37,22 +37,40 @@
 
 ## 📂 目录结构
 
+源码按平台分成 `windows/` 和 `linux/` 两个目录，**各自都是完整可用的**，进哪个目录就按那个目录的说明跑。
+
 ```
-printer-monitor/
-├── server.js              # 后端（SNMP 采集 + Web 服务 + 登录认证）
-├── printer-monitor.html   # 前端面板（单文件，无需构建）
-├── node_modules/          # SNMP 依赖（net-snmp 等，已随包提供，离线可用）
-├── install.sh             # Linux 一键安装 / 升级脚本（systemd）
-├── change-password.sh     # Linux：管理员密码管理（强密码 / 定期轮换）
-├── set-password.bat/.js   # Windows：设置 / 开启管理员登录（默认无需登录，可选启用）
-├── start.bat              # Windows 一键启动（有内置 node.exe 时双击即用）
-├── printers.json          # 设备清单与配置（首次运行自动生成）
-├── printers.json.example   # 配置模板（git 提交，含一台模拟打印机）
+Printer-Monitor/
+├── windows/                   # 🪟 Windows 版（整目录拷走即用）
+│   ├── server.js              #   后端（SNMP 采集 + Web 服务 + 登录认证）
+│   ├── printer-monitor.html   #   前端面板（单文件，无需构建）
+│   ├── package.json           #   依赖声明（net-snmp）
+│   ├── printers.json.example  #   配置模板（含一台模拟打印机）
+│   ├── start.bat              #   双击启动（有内置 node.exe 时零安装）
+│   ├── set-password.bat/.js   #   设置 / 开启管理员登录
+│   └── 1.ico · 2.png          #   图标资源
+│
+├── linux/                     # 🐧 Linux 版（整目录拷走即用）
+│   ├── server.js
+│   ├── printer-monitor.html
+│   ├── package.json
+│   ├── printers.json.example
+│   ├── install.sh             #   一键安装 / 升级（systemd + 防火墙）
+│   └── change-password.sh     #   管理员密码管理
+│
+├── docs/
+│   ├── 部署文档.md             #   详细部署 / 升级 / 排错
+│   └── 使用帮助.md             #   面板使用手册
+│
+├── panel.png                  # README 顶部界面截图
 ├── .gitignore
-├── README.md              # 本文件
-├── 部署文档.md             # 详细部署 / 升级 / 排错
-└── 使用帮助.md             # 面板使用手册
+└── README.md                  # 本文件
 ```
+
+> **两个目录里的 `server.js` / `printer-monitor.html` / `package.json` / `printers.json.example` 是同一份代码**（内容完全一致），拆开放只是为了让 Windows 用户和 Linux 用户各自看到一个完整、能直接跑的目录。改代码时两份要同步改（一般先在 `linux/` 改好、验证通过，再拷到 `windows/`）。
+>
+> 仓库里**不含** `node.exe` 和 `node_modules/`（体积大、且分平台）——这两个在 **Releases 的 zip** 里，下载即用。直接从源码跑需要自己 `npm install` 或配好 Node 18+ 环境。
+>
 
 ---
 
@@ -76,7 +94,9 @@ printer-monitor/
 1. 从 **Releases** 下载 `printer-monitor-windows.zip`，解压到任意目录（桌面 / D 盘均可，不要放 `C:\Program Files`）。
 2. 双击 `start.bat`，浏览器自动打开 `http://localhost:8899`。
 
-> 详见 `使用帮助.md`；内置 `node.exe`，无需安装 Node。
+> 详见 `docs/使用帮助.md`；内置 `node.exe`，无需安装 Node。
+
+> **从源码跑**（不想下 zip）：把 `windows/` 整个目录拷出来，本机装好 Node 18+ 后在里执行 `npm install`，再双击 `start.bat`（无 `node.exe` 时 `start.bat` 会自动回退用系统 `node`）。
 
 ### Linux（推荐作为对外服务，systemd）
 
@@ -85,8 +105,8 @@ printer-monitor/
 sudo bash install.sh            # 默认端口 8899
 sudo PORT=9260 bash install.sh  # 自定义端口
 
-# 方式二（有 git 环境）：克隆仓库后安装
-# git clone https://github.com/Hadesls/Printer-Monitor.git && cd Printer-Monitor
+# 方式二（有 git 环境）：克隆仓库后进入 linux/ 目录安装
+# git clone https://github.com/Hadesls/Printer-Monitor.git && cd Printer-Monitor/linux
 # sudo bash install.sh
 
 # 管理
