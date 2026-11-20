@@ -94,29 +94,129 @@ function normalizeZoneConfig(z) {
     fallback: String(src.fallback || '其他').trim() || '其他'           // 未匹配时的默认区域名
   };
 }
+// ==================== 配置文件读取容错（Windows 小白友好） ====================
+// Windows 用户常用记事本 / PowerShell 编辑 printers.json，容易存成：
+//   UTF-8 带 BOM、UTF-16（记事本的"Unicode"）、ANSI/GBK（记事本的"ANSI"）；
+// 也容易手抖留下多余逗号或加注释。这些都会让 JSON.parse 直接失败 —— 旧逻辑会当成
+// "配置损坏"并把内存配置清空，之后任何一次保存就把全部打印机覆盖掉。这里统一兼容。
+let CONFIG_CORRUPT = null;   // { path, backup } 原配置文件坏掉时记录，保存时改写到 .recovered
+
+function decodeConfigBuffer(buf) {
+  if (buf.length >= 3 && buf[0] === 0xEF && buf[1] === 0xBB && buf[2] === 0xBF) {
+    return { text: buf.subarray(3).toString('utf8'), enc: 'UTF-8 带BOM' };
+  }
+  if (buf.length >= 2 && buf[0] === 0xFF && buf[1] === 0xFE) {
+    return { text: buf.subarray(2).toString('utf16le'), enc: 'UTF-16 LE' };
+  }
+  if (buf.length >= 2 && buf[0] === 0xFE && buf[1] === 0xFF) {
+    const sw = Buffer.from(buf.subarray(2));
+    for (let i = 0; i + 1 < sw.length; i += 2) { const t = sw[i]; sw[i] = sw[i + 1]; sw[i + 1] = t; }
+    return { text: sw.toString('utf16le'), enc: 'UTF-16 BE' };
+  }
+  try {
+    // fatal=true：遇到非法 UTF-8 字节直接抛错，好判断"这其实不是 UTF-8"
+    return { text: new TextDecoder('utf-8', { fatal: true }).decode(buf), enc: 'UTF-8' };
+  } catch (e) { /* 不是合法 UTF-8，继续回退 */ }
+  try {
+    return { text: new TextDecoder('gbk').decode(buf), enc: 'GBK/ANSI' };
+  } catch (e) { /* 运行环境没有 GBK 支持 */ }
+  return { text: buf.toString('utf8'), enc: '未知编码' };
+}
+
+// 宽容解析：去掉 // 与 /* */ 注释、去掉对象/数组里多余的末尾逗号（只在字符串外处理）
+function stripJsonLoose(text) {
+  let out = '', inStr = false, esc = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i], nx = text[i + 1];
+    if (inStr) {
+      out += ch;
+      if (esc) esc = false;
+      else if (ch === '\\') esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') { inStr = true; out += ch; continue; }
+    if (ch === '/' && nx === '/') { while (i < text.length && text[i] !== '\n') i++; continue; }
+    if (ch === '/' && nx === '*') { i += 2; while (i < text.length && !(text[i] === '*' && text[i + 1] === '/')) i++; i++; continue; }
+    out += ch;
+  }
+  let res = '', inS = false, es = false;
+  for (let k = 0; k < out.length; k++) {
+    const c = out[k];
+    if (inS) {
+      res += c;
+      if (es) es = false;
+      else if (c === '\\') es = true;
+      else if (c === '"') inS = false;
+      continue;
+    }
+    if (c === '"') { inS = true; res += c; continue; }
+    if (c === ',') {                       // 逗号后面紧跟 } 或 ] → 丢弃这个多余逗号
+      let j = k + 1;
+      while (j < out.length && /\s/.test(out[j])) j++;
+      if (out[j] === '}' || out[j] === ']') continue;
+    }
+    res += c;
+  }
+  return res;
+}
+
 function loadConfig() {
   const candidates = resolveConfigPath();
   for (const cp of candidates) {
+    let buf;
+    try { buf = fs.readFileSync(cp); } catch (e) { continue; }   // 不存在 / 无权限 → 试下一个路径
+
+    const dec = decodeConfigBuffer(buf);
+    let raw = null, errMsg = '';
     try {
-      const raw = JSON.parse(fs.readFileSync(cp, 'utf8'));
-      config = Object.assign(config, raw);
-      CONFIG_PATH = cp;   // 记住实际读取成功的路径
-      // 顺序分配唯一 ID（避免 map 过程中读到旧数组导致重复）
-      let id = Math.max(0, ...(config.printers || []).map(p => Number(p.id) || 0));
-      config.printers = (config.printers || []).map(p => { const s = sanitize(p); s.id = p.id || (++id); return s; });
-      // 兼容旧版：dismissedAlerts 曾为数组（永久静音），迁移为 map(id->过期时间戳)，旧条目保留为永久
-      if (Array.isArray(config.dismissedAlerts)) {
-        const m = {};
-        config.dismissedAlerts.forEach(x => { if (x) m[String(x)] = 8640000000000000; });
-        config.dismissedAlerts = m;
-      }
-      if (typeof config.dismissHours !== 'number' || config.dismissHours <= 0) config.dismissHours = 1;
-      if (!config.alertSince || typeof config.alertSince !== 'object') config.alertSince = {};
-      config.zoneConfig = normalizeZoneConfig(config.zoneConfig);
-      return;
-    } catch (e) { /* try next */ }
+      raw = JSON.parse(dec.text);
+    } catch (e1) {
+      try { raw = JSON.parse(stripJsonLoose(dec.text)); }        // 容忍注释 / 多余逗号
+      catch (e2) { errMsg = e2.message; }
+    }
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+      // 真的坏了：备份原文件 + 大声报错。绝不清空后继续保存，否则会冲掉用户的设备清单。
+      const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
+      let bak = cp + '.bad-' + stamp;
+      try { fs.writeFileSync(bak, buf); } catch (e3) { bak = '（备份失败：' + e3.message + '）'; }
+      console.error('────────────────────────────────────────────────────────────');
+      console.error('[配置] printers.json 无法解析，已跳过该文件。');
+      console.error('[配置] 文件: ' + cp + '    识别到的编码: ' + dec.enc);
+      console.error('[配置] 原因: ' + (errMsg || '顶层不是 JSON 对象'));
+      console.error('[配置] 原文件已备份到: ' + bak);
+      console.error('[配置] 本次运行的改动会写到 printers.json.recovered，不会覆盖你的原文件。');
+      console.error('[配置] 修好 printers.json 后重启程序，即可恢复原有设备清单。');
+      console.error('────────────────────────────────────────────────────────────');
+      CONFIG_CORRUPT = { path: cp, backup: bak };
+      continue;
+    }
+
+    config = Object.assign(config, raw);
+    CONFIG_PATH = cp;   // 记住实际读取成功的路径
+    if (!Array.isArray(config.printers)) config.printers = [];
+    if (!config.community) config.community = 'public';
+    // 顺序分配唯一 ID（避免 map 过程中读到旧数组导致重复）
+    let id = Math.max(0, ...config.printers.map(p => Number(p.id) || 0));
+    config.printers = config.printers.map(p => { const s = sanitize(p); s.id = p.id || (++id); return s; });
+    // 兼容旧版：dismissedAlerts 曾为数组（永久静音），迁移为 map(id->过期时间戳)，旧条目保留为永久
+    if (Array.isArray(config.dismissedAlerts)) {
+      const m = {};
+      config.dismissedAlerts.forEach(x => { if (x) m[String(x)] = 8640000000000000; });
+      config.dismissedAlerts = m;
+    }
+    if (typeof config.dismissHours !== 'number' || config.dismissHours <= 0) config.dismissHours = 1;
+    if (!config.alertSince || typeof config.alertSince !== 'object') config.alertSince = {};
+    config.zoneConfig = normalizeZoneConfig(config.zoneConfig);
+    if (dec.enc !== 'UTF-8') {
+      console.log('[配置] 已按「' + dec.enc + '」读取 printers.json 并自动转码（中文不会乱码）；');
+      console.log('[配置] 下次在面板里保存时会自动写回 UTF-8（无 BOM），以后就不会再报警了。');
+    }
+    return;
   }
-  console.log('[配置] printers.json 不存在或损坏，使用空配置（将写入:', candidates[0], '）');
+  if (!CONFIG_CORRUPT) {
+    console.log('[配置] printers.json 不存在或损坏，使用空配置（将写入:', candidates[0], '）');
+  }
   config.printers = [];
   config.zoneConfig = normalizeZoneConfig(null);
   CONFIG_PATH = candidates[0];
@@ -130,7 +230,16 @@ function saveConfig() {
   for (const cp of candidates) {
     try {
       fs.mkdirSync(path.dirname(cp), { recursive: true });
-      fs.writeFileSync(cp, text, 'utf8');
+      // 原配置文件已损坏时改写 .recovered，绝不用空清单覆盖用户的原文件
+      let target = cp;
+      if (CONFIG_CORRUPT && path.resolve(cp) === path.resolve(CONFIG_CORRUPT.path)) {
+        target = cp + '.recovered';
+        if (!CONFIG_CORRUPT.warned) {
+          CONFIG_CORRUPT.warned = true;
+          console.error('[配置] 原 printers.json 已损坏，本次改动写入 ' + target + '（未覆盖原文件）');
+        }
+      }
+      fs.writeFileSync(target, text, 'utf8');
       CONFIG_PATH = cp;
       return;
     } catch (e) { /* 尝试下一个可写路径 */ }
@@ -831,13 +940,18 @@ function snapshot(authed) {
     source: config.printers.some(p => !p.demo) ? 'snmp' : (config.printers.length ? 'demo' : 'empty'),
     updatedAt: new Date().toISOString(),
     pollIntervalSec: config.pollIntervalSec,
-    printers: config.printers.map(p => Object.assign({}, p, { zone: zoneOf(p.ip) })),
+    printers: config.printers.map(p => {
+      const o = Object.assign({}, p, { zone: zoneOf(p.ip) });
+      // 团体名属于 SNMP 凭据，不对未登录访客下发
+      if (!authed) delete o.community;
+      return o;
+    }),
     zoneConfig: config.zoneConfig,
     alerts: computeAlerts(),
     totalPages: config.printers.reduce((s, p) => s + (Number(p.pages) || 0), 0),
   };
   // 静音信息（已屏蔽设备 / 永久静音告警）仅登录后的管理员可见，访客彻底不返回
-  if (authed) { out.suppressedDevices = suppressedDevices; out.permanentMutedAlerts = permanentMutedAlerts; }
+  if (authed) { out.suppressedDevices = suppressedDevices; out.permanentMutedAlerts = permanentMutedAlerts; out.defaultCommunity = config.community || 'public'; }
   return out;
 }
 
